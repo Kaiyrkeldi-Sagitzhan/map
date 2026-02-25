@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with PostGIS for geospatial data
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: kzmap-postgres
+    environment:
+      POSTGRES_DB: kzmap
+      POSTGRES_USER: kzmap_user
+      POSTGRES_PASSWORD: kzmap_password
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kzmap_user -d kzmap"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kzmap-network
+
+  # Auth Service (Go + Gin)
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: kzmap-auth-service
+    environment:
+      PORT: 8081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: kzmap
+      DB_USER: kzmap_user
+      DB_PASSWORD: kzmap_password
+      JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
+      JWT_EXPIRY_HOURS: 24
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
+  # Map Service (Go + Gin)
+  map-service:
+    build:
+      context: ./map-service
+      dockerfile: Dockerfile
+    container_name: kzmap-map-service
+    environment:
+      PORT: 8082
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: kzmap
+      DB_USER: kzmap_user
+      DB_PASSWORD: kzmap_password
+      JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kzmap-frontend
+    environment:
+      VITE_API_URL: http://localhost:8080
+      VITE_AUTH_SERVICE_URL: http://localhost:8081
+      VITE_MAP_SERVICE_URL: http://localhost:8082
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - map-service
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
+  # API Gateway (Nginx)
+  api-gateway:
+    image: nginx:alpine
+    container_name: kzmap-api-gateway
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - auth-service
+      - map-service
+      - frontend
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  kzmap-network:
+    driver: bridge
