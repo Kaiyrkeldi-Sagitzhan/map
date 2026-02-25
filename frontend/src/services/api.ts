@@ -9,8 +9,8 @@ import type {
   UpdateGeoObjectRequest 
 } from '../types';
 
-const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8081';
-const MAP_SERVICE_URL = import.meta.env.VITE_MAP_SERVICE_URL || 'http://localhost:8082';
+const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8080';
+const MAP_SERVICE_URL = import.meta.env.VITE_MAP_SERVICE_URL || 'http://localhost:8080';
 
 class ApiService {
   private authClient: AxiosInstance;

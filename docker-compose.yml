@@ -79,8 +79,8 @@ services:
     container_name: kzmap-frontend
     environment:
       VITE_API_URL: http://localhost:8080
-      VITE_AUTH_SERVICE_URL: http://localhost:8081
-      VITE_MAP_SERVICE_URL: http://localhost:8082
+      VITE_AUTH_SERVICE_URL: http://api-gateway
+      VITE_MAP_SERVICE_URL: http://api-gateway
     ports:
       - "3000:3000"
     depends_on:

@@ -42,10 +42,16 @@ function MapBoundsUpdater({ geoJson }: { geoJson: any }) {
 
   useEffect(() => {
     if (geoJson && geoJson.features && geoJson.features.length > 0) {
-      const layer = L.geoJSON(geoJson)
-      const bounds = layer.getBounds()
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [50, 50] })
+      try {
+        const layer = L.geoJSON(geoJson)
+        const bounds = layer.getBounds()
+        console.log('MapBoundsUpdater: bounds:', bounds)
+        console.log('MapBoundsUpdater: isValid:', bounds.isValid())
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50] })
+        }
+      } catch (e) {
+        console.error('MapBoundsUpdater error:', e)
       }
     }
   }, [geoJson, map])
@@ -148,15 +154,20 @@ export default function MapView() {
   const fetchGeoObjects = useCallback(async () => {
     try {
       const response = await apiService.getGeoObjects()
+      console.log('Fetched geo objects:', response.objects.length)
+      response.objects.forEach((obj, i) => {
+        console.log(`Object ${i}:`, obj.id, obj.name, obj.type, JSON.stringify(obj.geometry).substring(0, 100))
+      })
       setGeoObjects(response.objects)
     } catch (error) {
       console.error('Error fetching geo objects:', error)
     }
   }, [])
 
+  // Re-fetch when mapMode changes
   useEffect(() => {
     fetchGeoObjects()
-  }, [fetchGeoObjects])
+  }, [fetchGeoObjects, mapMode])
 
   // Filter objects by visibility
   const visibleObjects = geoObjects.filter(
@@ -315,6 +326,8 @@ export default function MapView() {
       geometry: obj.geometry,
     }))
   }
+
+  console.log('Rendering GeoJSON:', JSON.stringify(objectsGeoJSON).substring(0, 500))
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-slate-100 dark:bg-slate-950">
