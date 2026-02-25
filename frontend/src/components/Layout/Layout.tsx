@@ -10,7 +10,7 @@ export default function Layout({ children }: LayoutProps) {
   const { user, isAdmin, logout } = useAuth()
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="h-screen overflow-hidden bg-slate-950">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-50">
         <div className="h-full px-6 flex items-center justify-between">
@@ -47,7 +47,7 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className="pt-16">
+      <main className="pt-16 h-full overflow-hidden">
         {children}
       </main>
     </div>

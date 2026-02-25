@@ -76,7 +76,7 @@ CREATE TRIGGER update_users_updated_at
 -- This is a placeholder - in production, use proper password hashing
 INSERT INTO users (id, email, password_hash, role) 
 VALUES 
-    ('00000000-0000-0000-0000-000000000001', 'admin@kzmap.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'admin')
+    ('00000000-0000-0000-0000-000000000001', 'admin@kzmap.edu', '$2b$12$FoI23s3/fDlGnVh9Hjyjau/Q96OIW6bstNkvn3CnnyzvRHwzmr3hq', 'admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- Grant necessary permissions
