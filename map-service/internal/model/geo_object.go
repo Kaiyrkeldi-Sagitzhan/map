@@ -36,6 +36,10 @@ const (
 	TypeCity       = "city"
 	TypeRoad       = "road"
 	TypeBoundary   = "boundary"
+	TypeForest     = "forest"
+	TypeRelief     = "relief"
+	TypeBuilding   = "building"
+	TypeCustom     = "custom"
 	TypeOther      = "other"
 )
 
@@ -46,7 +50,7 @@ func ValidScopes() []string {
 
 // ValidTypes returns all valid object type values
 func ValidTypes() []string {
-	return []string{TypeRiver, TypeLake, TypeMountain, TypeRegion, TypeCity, TypeRoad, TypeBoundary, TypeOther}
+	return []string{TypeRiver, TypeLake, TypeMountain, TypeRegion, TypeCity, TypeRoad, TypeBoundary, TypeForest, TypeRelief, TypeBuilding, TypeCustom, TypeOther}
 }
 
 // IsValidScope checks if the scope is valid

@@ -13,6 +13,7 @@ type Config struct {
 	DBName        string
 	DBUser        string
 	DBPassword    string
+	RedisURL      string
 	JWTSecret     string
 }
 
@@ -25,6 +26,7 @@ func Load() *Config {
 		DBName:     getEnv("DB_NAME", "kzmap"),
 		DBUser:     getEnv("DB_USER", "kzmap_user"),
 		DBPassword: getEnv("DB_PASSWORD", "kzmap_password"),
+		RedisURL:   getEnv("REDIS_URL", "localhost:6379"),
 		JWTSecret:  getEnv("JWT_SECRET", "kazakhstan-map-secret-key-2024"),
 	}
 }

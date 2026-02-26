@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"log"
 	"net/http"
+	"strconv"
 
 	"map-service/internal/dto"
 	"map-service/internal/middleware"
@@ -109,8 +111,35 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 	// Get type filter from query parameter
 	objType := c.Query("type")
 
-	resp, err := h.service.GetAll(c.Request.Context(), userID, isAdmin, objType)
+	// Get bbox parameters
+	minLatStr := c.Query("minLat")
+	minLngStr := c.Query("minLng")
+	maxLatStr := c.Query("maxLat")
+	maxLngStr := c.Query("maxLng")
+	zoomStr := c.Query("zoom")
+
+	var resp *dto.GeoObjectListResponse
+	var err error
+
+	if minLatStr != "" && minLngStr != "" && maxLatStr != "" && maxLngStr != "" {
+		minLat, _ := strconv.ParseFloat(minLatStr, 64)
+		minLng, _ := strconv.ParseFloat(minLngStr, 64)
+		maxLat, _ := strconv.ParseFloat(maxLatStr, 64)
+		maxLng, _ := strconv.ParseFloat(maxLngStr, 64)
+		zoom, _ := strconv.Atoi(zoomStr)
+		if zoomStr == "" {
+			zoom = 10 // default
+		}
+		clip := c.Query("clip") == "true"
+		filterByZoom := c.Query("filterByZoom") != "false" // default true
+
+		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom)
+	} else {
+		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType)
+	}
+
 	if err != nil {
+		log.Printf("[ERROR] GetAll failed: %v (type=%s, bbox=%s,%s,%s,%s zoom=%s)", err, objType, minLatStr, minLngStr, maxLatStr, maxLngStr, zoomStr)
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "internal_error",
 			Message: "Failed to retrieve objects",

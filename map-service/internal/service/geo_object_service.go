@@ -25,12 +25,13 @@ var (
 
 // GeoObjectService handles geo object business logic
 type GeoObjectService struct {
-	repo *repository.GeoObjectRepository
+	repo  *repository.GeoObjectRepository
+	cache *repository.RedisCache
 }
 
 // NewGeoObjectService creates a new GeoObjectService instance
-func NewGeoObjectService(repo *repository.GeoObjectRepository) *GeoObjectService {
-	return &GeoObjectService{repo: repo}
+func NewGeoObjectService(repo *repository.GeoObjectRepository, cache *repository.RedisCache) *GeoObjectService {
+	return &GeoObjectService{repo: repo, cache: cache}
 }
 
 // Create creates a new geo object
@@ -88,6 +89,11 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 		return nil, err
 	}
 
+	// Invalidate cache
+	if s.cache != nil {
+		_ = s.cache.InvalidateLists(ctx)
+	}
+
 	return &dto.GeoObjectResponse{
 		ID:          obj.ID,
 		OwnerID:     obj.OwnerID,
@@ -123,9 +129,29 @@ func (s *GeoObjectService) GetByID(ctx context.Context, id uuid.UUID, userID uui
 
 // GetAll retrieves all accessible geo objects
 func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string) (*dto.GeoObjectListResponse, error) {
+	// Try to get from cache first
+	if s.cache != nil {
+		cachedObjects, err := s.cache.GetList(ctx, userID, isAdmin, objType)
+		if err == nil && cachedObjects != nil {
+			responses := make([]dto.GeoObjectResponse, len(cachedObjects))
+			for i, obj := range cachedObjects {
+				responses[i] = toResponse(&obj)
+			}
+			return &dto.GeoObjectListResponse{
+				Objects: responses,
+				Total:   len(responses),
+			}, nil
+		}
+	}
+
 	objects, err := s.repo.GetAll(ctx, userID, isAdmin, objType)
 	if err != nil {
 		return nil, err
+	}
+
+	// Save to cache
+	if s.cache != nil {
+		_ = s.cache.SetList(ctx, userID, isAdmin, objType, objects)
 	}
 
 	responses := make([]dto.GeoObjectResponse, len(objects))
@@ -133,6 +159,44 @@ func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin
 		resp := toResponse(&obj)
 		log.Printf("[DEBUG] GetAll object %d: id=%s, type=%s, geometry=%s", i+1, obj.ID, obj.Type, string(obj.Geometry))
 		responses[i] = resp
+	}
+
+	return &dto.GeoObjectListResponse{
+		Objects: responses,
+		Total:   len(responses),
+	}, nil
+}
+
+// GetInBBox retrieves geo objects within a bounding box
+func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool) (*dto.GeoObjectListResponse, error) {
+	// Try bbox cache first
+	if s.cache != nil {
+		cachedObjects, err := s.cache.GetBBox(ctx, zoom, minLat, minLng, maxLat, maxLng, objType, filterByZoom)
+		if err == nil && cachedObjects != nil {
+			responses := make([]dto.GeoObjectResponse, len(cachedObjects))
+			for i, obj := range cachedObjects {
+				responses[i] = toResponse(&obj)
+			}
+			return &dto.GeoObjectListResponse{
+				Objects: responses,
+				Total:   len(responses),
+			}, nil
+		}
+	}
+
+	objects, err := s.repo.GetByBBox(ctx, userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save to bbox cache
+	if s.cache != nil {
+		_ = s.cache.SetBBox(ctx, zoom, minLat, minLng, maxLat, maxLng, objType, filterByZoom, objects)
+	}
+
+	responses := make([]dto.GeoObjectResponse, len(objects))
+	for i, obj := range objects {
+		responses[i] = toResponse(&obj)
 	}
 
 	return &dto.GeoObjectListResponse{
@@ -232,6 +296,11 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 		return nil, err
 	}
 
+	// Invalidate cache
+	if s.cache != nil {
+		_ = s.cache.InvalidateLists(ctx)
+	}
+
 	resp := toResponse(updated)
 	return &resp, nil
 }
@@ -252,7 +321,11 @@ func (s *GeoObjectService) Delete(ctx context.Context, id uuid.UUID, userID uuid
 		return ErrAccessDenied
 	}
 
-	return s.repo.Delete(ctx, id)
+	err = s.repo.Delete(ctx, id)
+	if err == nil && s.cache != nil {
+		_ = s.cache.InvalidateLists(ctx)
+	}
+	return err
 }
 
 // canAccess checks if user can access the object

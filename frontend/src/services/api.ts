@@ -1,12 +1,12 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import type { 
-  AuthResponse, 
-  LoginRequest, 
-  RegisterRequest, 
-  GeoObject, 
+import type {
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  GeoObject,
   GeoObjectListResponse,
   CreateGeoObjectRequest,
-  UpdateGeoObjectRequest 
+  UpdateGeoObjectRequest
 } from '../types';
 
 const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8080';
@@ -76,8 +76,18 @@ class ApiService {
   }
 
   // Geo object methods
-  async getGeoObjects(type?: string): Promise<GeoObjectListResponse> {
-    const params = type ? { type } : {};
+  async getGeoObjects(type?: string, bbox?: { minLat: number, minLng: number, maxLat: number, maxLng: number, zoom?: number, clip?: boolean, filterByZoom?: boolean }): Promise<GeoObjectListResponse> {
+    const params: Record<string, any> = {};
+    if (type) params.type = type;
+    if (bbox) {
+      params.minLat = bbox.minLat;
+      params.minLng = bbox.minLng;
+      params.maxLat = bbox.maxLat;
+      params.maxLng = bbox.maxLng;
+      if (bbox.zoom !== undefined) params.zoom = bbox.zoom;
+      if (bbox.clip) params.clip = 'true';
+      if (bbox.filterByZoom !== undefined) params.filterByZoom = bbox.filterByZoom ? 'true' : 'false';
+    }
     const response = await this.mapClient.get<GeoObjectListResponse>('/api/map/objects', { params });
     return response.data;
   }

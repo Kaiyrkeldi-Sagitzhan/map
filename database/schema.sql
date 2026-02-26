@@ -54,6 +54,10 @@ CREATE INDEX IF NOT EXISTS idx_geo_objects_type
 CREATE INDEX IF NOT EXISTS idx_geo_objects_scope_owner_type 
     ON geo_objects (scope, owner_id, type);
 
+-- BTree index specifically for fast layer filtering of global map data
+CREATE INDEX IF NOT EXISTS idx_geo_objects_scope_type
+    ON geo_objects USING btree (scope, type);
+
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

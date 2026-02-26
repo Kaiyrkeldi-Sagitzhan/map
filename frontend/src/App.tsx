@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
-import MapView from './components/Map/MapView'
+import MapEditor from './components/Editor/MapEditor'
 import Layout from './components/Layout/Layout'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -21,8 +21,8 @@ function App() {
           <PrivateRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<MapView />} />
-                <Route path="/map" element={<MapView />} />
+                <Route path="/" element={<MapEditor />} />
+                <Route path="/map" element={<MapEditor />} />
               </Routes>
             </Layout>
           </PrivateRoute>

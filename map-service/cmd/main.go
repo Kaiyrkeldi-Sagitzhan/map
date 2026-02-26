@@ -38,8 +38,12 @@ func main() {
 	// Initialize repository
 	geoObjectRepository := repository.NewGeoObjectRepository(db)
 
+	// Initialize Redis cache
+	redisCache := repository.NewRedisCache(cfg.RedisURL)
+	defer redisCache.Close()
+
 	// Initialize service
-	geoObjectService := service.NewGeoObjectService(geoObjectRepository)
+	geoObjectService := service.NewGeoObjectService(geoObjectRepository, redisCache)
 
 	// Initialize handler
 	geoObjectHandler := handler.NewGeoObjectHandler(geoObjectService)

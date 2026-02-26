@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.vite/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+*.log
+import*.log
+
+# Databases & Large Files
+*.gpkg
+*.zip
+*.csv
+postgres_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+bin/
+map-service/map-service
+auth-service/auth-service

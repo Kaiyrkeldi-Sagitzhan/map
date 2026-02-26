@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"math"
 
 	"map-service/internal/model"
 
@@ -99,7 +101,7 @@ func extractGeometryJSON(geometry []byte) (json.RawMessage, error) {
 // GetByID retrieves a geo object by ID
 func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.GeoObjectWithGeometry, error) {
 	query := `
-		SELECT id, owner_id, scope, type, name, description, metadata, 
+		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, 
 		       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
 		FROM geo_objects
 		WHERE id = $1
@@ -136,44 +138,18 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 	var args []interface{}
 
 	if isAdmin {
-		// Admin can see all objects
 		if objType != "" {
-			query = `
-				SELECT id, owner_id, scope, type, name, description, metadata, 
-				       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
-				FROM geo_objects
-				WHERE type = $1
-				ORDER BY created_at DESC
-			`
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE type = $1 ORDER BY created_at DESC`
 			args = []interface{}{objType}
 		} else {
-			query = `
-				SELECT id, owner_id, scope, type, name, description, metadata, 
-				       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
-				FROM geo_objects
-				ORDER BY created_at DESC
-			`
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects ORDER BY created_at DESC`
 		}
 	} else {
-		// Regular user can see global objects and their own private objects
 		if objType != "" {
-			query = `
-				SELECT id, owner_id, scope, type, name, description, metadata, 
-				       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
-				FROM geo_objects
-				WHERE (scope = 'global' OR owner_id = $1)
-				  AND type = $2
-				ORDER BY created_at DESC
-			`
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1) AND type = $2 ORDER BY created_at DESC`
 			args = []interface{}{userID, objType}
 		} else {
-			query = `
-				SELECT id, owner_id, scope, type, name, description, metadata, 
-				       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
-				FROM geo_objects
-				WHERE scope = 'global' OR owner_id = $1
-				ORDER BY created_at DESC
-			`
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE scope = 'global' OR owner_id = $1 ORDER BY created_at DESC`
 			args = []interface{}{userID}
 		}
 	}
@@ -210,10 +186,159 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 	return objects, nil
 }
 
+// typesForZoom returns allowed object types for a given zoom level.
+// At low zoom, only large features are shown; at high zoom, everything is visible.
+func typesForZoom(zoom int) []string {
+	switch {
+	case zoom <= 4:
+		return []string{"region", "boundary"}
+	case zoom <= 7:
+		return []string{"region", "boundary", "river", "lake", "road"}
+	case zoom <= 10:
+		return []string{"region", "boundary", "river", "lake", "road", "forest", "mountain", "city", "relief"}
+	case zoom <= 13:
+		return []string{"region", "boundary", "river", "lake", "road", "forest", "mountain", "city", "relief", "custom", "other"}
+	default:
+		// zoom 14+: everything including buildings
+		return nil // nil means no filter
+	}
+}
+
+// GetByBBox retrieves geo objects within a bounding box, with optional simplification and clipping
+func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool) ([]model.GeoObjectWithGeometry, error) {
+	var query string
+	var args []interface{}
+
+	// Calculate simplification tolerance
+	tolerance := 0.0
+	if zoom < 16 {
+		tolerance = 0.1 / math.Pow(2, float64(zoom))
+	}
+
+	// BBox coordinates
+	bboxSQL := "ST_MakeEnvelope($1, $2, $3, $4, 4326)"
+
+	geomColumn := "ST_MakeValid(geometry)"
+	if clip {
+		geomColumn = fmt.Sprintf("ST_CollectionExtract(ST_Intersection(ST_MakeValid(geometry), %s))", bboxSQL)
+	}
+
+	geomSQL := fmt.Sprintf("ST_AsGeoJSON(ST_SimplifyPreserveTopology(%s, %f)) as geometry", geomColumn, tolerance)
+
+	// Filter out empty/invalid geometries
+	emptyFilter := ""
+	if clip {
+		emptyFilter = fmt.Sprintf(" AND NOT ST_IsEmpty(ST_Intersection(ST_MakeValid(geometry), %s))", bboxSQL)
+	}
+
+	// Build zoom-based type filter when no explicit type is passed and filterByZoom is enabled
+	zoomFilter := ""
+	if objType == "" && filterByZoom {
+		allowed := typesForZoom(zoom)
+		if allowed != nil {
+			zoomFilter = " AND type IN ("
+			for i, t := range allowed {
+				if i > 0 {
+					zoomFilter += ","
+				}
+				zoomFilter += fmt.Sprintf("'%s'", t)
+			}
+			zoomFilter += ")"
+		}
+	}
+
+	// Limit results to prevent overload; order by area descending (largest first)
+	const maxResults = 5000
+	orderAndLimit := fmt.Sprintf(" ORDER BY ST_Area(geometry) DESC LIMIT %d", maxResults)
+
+	if isAdmin {
+		if objType != "" {
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE type = $5 AND geometry && ` + bboxSQL + emptyFilter + orderAndLimit + `
+			`
+			args = []interface{}{minLng, minLat, maxLng, maxLat, objType}
+		} else {
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE geometry && ` + bboxSQL + zoomFilter + emptyFilter + orderAndLimit + `
+			`
+			args = []interface{}{minLng, minLat, maxLng, maxLat}
+		}
+	} else {
+		if objType != "" {
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE (scope = 'global' OR owner_id = $5)
+				  AND type = $6 AND geometry && ` + bboxSQL + emptyFilter + orderAndLimit + `
+			`
+			args = []interface{}{minLng, minLat, maxLng, maxLat, userID, objType}
+		} else {
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE (scope = 'global' OR owner_id = $5)
+				  AND geometry && ` + bboxSQL + zoomFilter + emptyFilter + orderAndLimit + `
+			`
+			args = []interface{}{minLng, minLat, maxLng, maxLat, userID}
+		}
+	}
+
+	log.Printf("[DEBUG] GetByBBox query: type=%s zoom=%d clip=%v filterByZoom=%v", objType, zoom, clip, filterByZoom)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		log.Printf("[ERROR] GetByBBox SQL error: %v", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var objects []model.GeoObjectWithGeometry
+	for rows.Next() {
+		var obj model.GeoObjectWithGeometry
+		var description sql.NullString
+		var geometryDB sql.NullString
+		err := rows.Scan(
+			&obj.ID,
+			&obj.OwnerID,
+			&obj.Scope,
+			&obj.Type,
+			&obj.Name,
+			&description,
+			&obj.Metadata,
+			&geometryDB,
+			&obj.CreatedAt,
+			&obj.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("[ERROR] GetByBBox scan error: %v (type=%s)", err, obj.Type)
+			return nil, err
+		}
+		if description.Valid {
+			obj.Description = description.String
+		}
+		// Skip rows with NULL/empty geometry (can happen from ST_Intersection edge cases)
+		if !geometryDB.Valid || geometryDB.String == "" || geometryDB.String == "null" {
+			continue
+		}
+		obj.Geometry = json.RawMessage(geometryDB.String)
+		objects = append(objects, obj)
+	}
+
+	log.Printf("[DEBUG] GetByBBox returned %d objects", len(objects))
+	return objects, nil
+}
+
 // GetByType retrieves geo objects by type
 func (r *GeoObjectRepository) GetByType(ctx context.Context, objType string) ([]model.GeoObjectWithGeometry, error) {
 	query := `
-		SELECT id, owner_id, scope, type, name, description, metadata, 
+		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, 
 		       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
 		FROM geo_objects
 		WHERE type = $1
@@ -319,7 +444,7 @@ func (r *GeoObjectRepository) Delete(ctx context.Context, id uuid.UUID) error {
 // GetByOwner retrieves geo objects by owner
 func (r *GeoObjectRepository) GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]model.GeoObjectWithGeometry, error) {
 	query := `
-		SELECT id, owner_id, scope, type, name, description, metadata, 
+		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, 
 		       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
 		FROM geo_objects
 		WHERE owner_id = $1
