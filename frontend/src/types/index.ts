@@ -44,6 +44,7 @@ export type ObjectType =
   | 'city' 
   | 'road' 
   | 'boundary' 
+  | 'administrative'
   | 'other';
 
 export interface GeoObjectListResponse {
@@ -78,6 +79,7 @@ export interface LayerVisibility {
   city: boolean;
   road: boolean;
   boundary: boolean;
+  administrative: boolean;
   other: boolean;
 }
 

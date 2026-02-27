@@ -3,7 +3,8 @@
  * Three-panel design: Left (Layers), Center (Map), Right (Properties).
  * Bottom: floating toolbar pill + coordinate display.
  */
-import { MapContainer, TileLayer, ScaleControl } from 'react-leaflet'
+import { useEffect, useRef } from 'react'
+import { MapContainer, TileLayer, ScaleControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -25,6 +26,27 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
 
+// Component to handle initial "Fly To" animation
+const GlobeAnimator = () => {
+    const map = useMap()
+    const animated = useRef(false)
+
+    useEffect(() => {
+        if (!animated.current) {
+            // Smoothly focus on Kazakhstan
+            setTimeout(() => {
+                map.flyTo([48.0196, 66.9237], 5, {
+                    duration: 2.0,
+                    easeLinearity: 0.2
+                })
+                animated.current = true
+            }, 500)
+        }
+    }, [map])
+
+    return null
+}
+
 const MapEditor = () => {
     const showMap = useEditorStore((s) => s.showMap)
     const isLoading = useEditorStore((s) => s.isLoading)
@@ -37,13 +59,15 @@ const MapEditor = () => {
             {/* Center: Map Area */}
             <main className={`relative flex-1 ${!showMap ? 'bg-[#fcfcfc]' : 'bg-white'}`}>
                 <MapContainer
-                    center={[48.0196, 66.9237]} // Center of Kazakhstan
-                    zoom={5}
-                    className="h-full w-full outline-none"
+                    center={[30.0, 66.9237]} // Slightly south for a "coming from below" feel
+                    zoom={3}
+                    className="h-full w-full outline-none bg-[#f2efe9]"
                     zoomControl={false}
                     minZoom={3}
-                    preferCanvas={true} // РЕНДЕРИНГ НА CANVAS (ЗАПЕКАНИЕ) — МГНОВЕННАЯ ОТРИСОВКА 100 000+ ОБЪЕКТОВ
+                    maxZoom={20}
+                    preferCanvas={true}
                 >
+                    <GlobeAnimator />
                     <TileLayer
                         url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'

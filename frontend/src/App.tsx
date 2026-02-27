@@ -4,25 +4,27 @@ import Login from './components/Auth/Login'
 import Register from './components/Auth/Register'
 import MapEditor from './components/Editor/MapEditor'
 import Layout from './components/Layout/Layout'
+import Landing from './components/Landing/Landing'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />
+  return isAuthenticated ? <>{children}</> : <Navigate to="/" />
 }
 
 function App() {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route
-        path="/*"
+        path="/editor/*"
         element={
           <PrivateRoute>
             <Layout>
               <Routes>
                 <Route path="/" element={<MapEditor />} />
-                <Route path="/map" element={<MapEditor />} />
+                <Route path="*" element={<MapEditor />} />
               </Routes>
             </Layout>
           </PrivateRoute>

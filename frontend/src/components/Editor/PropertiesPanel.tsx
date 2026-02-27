@@ -10,7 +10,7 @@ import type { FeatureClass, ClassStyle } from '../../types/editor'
 import { saveAs } from 'file-saver'
 import { apiService } from '../../services/api'
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'region', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'region', 'administrative', 'custom']
 
 export default function PropertiesPanel() {
     const {
@@ -157,9 +157,9 @@ export default function PropertiesPanel() {
     }
 
     return (
-        <div className="w-[320px] min-w-[320px] h-full bg-white border-l border-gray-200 flex flex-col z-[500] overflow-hidden">
+        <div className="w-[320px] min-w-[320px] h-full bg-white/70 backdrop-blur-md border-l border-gray-200/50 flex flex-col z-[500] overflow-hidden shadow-xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100/50">
                 <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Свойства</h2>
                 <button
                     onClick={handleClose}

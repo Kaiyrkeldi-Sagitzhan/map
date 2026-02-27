@@ -93,7 +93,7 @@ const tools: ToolDef[] = [
     },
 ]
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'region', 'administrative', 'custom']
 
 export default function Toolbar() {
     const { currentTool, setTool, featureClass, setFeatureClass, showMap, setShowMap, isLoading, loadVisibleObjects } = useEditorStore()

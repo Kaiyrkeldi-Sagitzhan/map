@@ -118,6 +118,18 @@ const typeFields: Record<ObjectType, FormField[]> = {
         },
         { key: 'established', label: 'Established year', type: 'number', placeholder: 'e.g. 1991' },
     ],
+    administrative: [
+        {
+            key: 'admin_level', label: 'Admin level', type: 'select', options: [
+                { value: '', label: 'Select...' },
+                { value: 'country', label: 'Country' },
+                { value: 'state', label: 'State/Province' },
+                { value: 'county', label: 'County/District' },
+                { value: 'city', label: 'City/Municipality' },
+            ]
+        },
+        { key: 'code', label: 'ISO/Admin code', type: 'text', placeholder: 'e.g. KZ-ALA' },
+    ],
     other: [
         { key: 'category', label: 'Category', type: 'text', placeholder: 'e.g. landmark, POI' },
     ],
@@ -181,6 +193,13 @@ const TypeIcon = ({ type, className = 'w-5 h-5' }: { type: ObjectType; className
                 <line x1="5" y1="12" x2="19" y2="12" strokeDasharray="2 3" />
             </svg>
         ),
+        administrative: (
+            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+            </svg>
+        ),
         other: (
             <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="2" />
@@ -200,6 +219,7 @@ const typeLabels: Record<ObjectType, string> = {
     city: 'City',
     road: 'Road',
     boundary: 'Boundary',
+    administrative: 'Administrative',
     other: 'Other',
 }
 
@@ -211,6 +231,7 @@ const typeColors: Record<ObjectType, string> = {
     city: '#f59e0b',
     road: '#6b7280',
     boundary: '#10b981',
+    administrative: '#6366f1',
     other: '#6366f1',
 }
 

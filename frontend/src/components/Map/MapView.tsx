@@ -124,6 +124,7 @@ const layerColors: Record<ObjectType, string> = {
   city: '#f59e0b',
   road: '#6b7280',
   boundary: '#10b981',
+  administrative: '#6366f1',
   other: '#6366f1',
 }
 
@@ -138,6 +139,7 @@ export default function MapView() {
     city: true,
     road: true,
     boundary: true,
+    administrative: true,
     other: true,
   })
   const [selectedType, setSelectedType] = useState<ObjectType>('region')
@@ -389,6 +391,7 @@ export default function MapView() {
                   <option value="city">City</option>
                   <option value="road">Road</option>
                   <option value="boundary">Boundary</option>
+                  <option value="administrative">Administrative</option>
                   <option value="other">Other</option>
                 </select>
               )}

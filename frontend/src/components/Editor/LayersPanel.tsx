@@ -41,9 +41,9 @@ export default function LayersPanel() {
     }
 
     return (
-        <div className="w-[280px] min-w-[280px] h-full bg-white border-r border-gray-200 flex flex-col z-[500] overflow-hidden">
+        <div className="w-[280px] min-w-[280px] h-full bg-white/70 backdrop-blur-md border-r border-gray-200/50 flex flex-col z-[500] overflow-hidden shadow-xl">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-gray-100/50 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex items-center gap-2">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <rect x="2" y="2" width="20" height="8" rx="1" /><rect x="2" y="14" width="20" height="8" rx="1" />

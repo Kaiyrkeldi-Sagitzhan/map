@@ -21,9 +21,18 @@ export default {
           900: '#312e81',
           950: '#1e1b4b',
         },
+        landing: {
+          dark: '#0A192F',
+          darker: '#020C1B',
+          gold: '#FFD700',
+          neon: '#00BFFF',
+          terminal: '#00FF00',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['"Times New Roman"', 'Georgia', 'serif'],
+        mono: ['Consolas', 'Monaco', '"Courier New"', 'monospace'],
       },
     },
   },

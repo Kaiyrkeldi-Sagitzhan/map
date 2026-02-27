@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
     setIsAdmin(response.user.role === 'admin')
     setIsAuthenticated(true)
-    navigate('/')
+    navigate('/editor')
   }
 
   const register = async (email: string, password: string, role?: string) => {
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user)
     setIsAdmin(response.user.role === 'admin')
     setIsAuthenticated(true)
-    navigate('/')
+    navigate('/editor')
   }
 
   const logout = () => {

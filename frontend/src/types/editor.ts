@@ -21,6 +21,7 @@ export type FeatureClass =
     | 'road'
     | 'building'
     | 'region'
+    | 'administrative'
     | 'custom'
 
 export interface ClassStyle {
@@ -38,6 +39,7 @@ export const CLASS_STYLES: Record<FeatureClass, ClassStyle> = {
     road: { color: '#0f172a', fillColor: 'transparent', weight: 3, fillOpacity: 0 },
     building: { color: '#4c1d95', fillColor: '#8b5cf6', weight: 1, fillOpacity: 0.5 },
     region: { color: '#334155', fillColor: '#94a3b8', weight: 2, fillOpacity: 0.1 },
+    administrative: { color: '#6366f1', fillColor: 'transparent', weight: 2, fillOpacity: 0 },
     custom: { color: '#4338ca', fillColor: '#6366f1', weight: 1.5, fillOpacity: 0.5 },
 }
 
@@ -52,6 +54,7 @@ export const CLASS_LABELS: Record<FeatureClass, string> = {
     road: 'Дорога',
     building: 'Здание',
     region: 'Область',
+    administrative: 'Админ. граница',
     custom: 'Все объекты (Разведка)',
 }
 

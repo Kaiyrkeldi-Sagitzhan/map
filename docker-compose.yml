@@ -99,6 +99,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # MapSCII WebSocket bridge
+  mapscii:
+    build:
+      context: ./mapscii-server
+      dockerfile: Dockerfile
+    container_name: kzmap-mapscii
+    ports:
+      - "9870:9870"
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
   # Frontend (React + Vite)
   frontend:
     build:
