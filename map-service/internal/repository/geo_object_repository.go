@@ -133,24 +133,43 @@ func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 }
 
 // GetAll retrieves all accessible geo objects (global + owned private)
-func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string) ([]model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
 
+	// Build search filter
+	searchFilter := ""
+	addSearch := func() {
+		if search != "" {
+			idx := len(args) + 1
+			searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", idx, idx)
+			args = append(args, search)
+		}
+	}
+
 	if isAdmin {
 		if objType != "" {
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE type = $1 ORDER BY created_at DESC`
 			args = []interface{}{objType}
+			addSearch()
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE type = $1` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
 		} else {
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects ORDER BY created_at DESC`
+			addSearch()
+			if searchFilter != "" {
+				// Remove leading " AND " for WHERE clause
+				query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE` + searchFilter[4:] + ` ORDER BY created_at DESC LIMIT 50`
+			} else {
+				query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects ORDER BY created_at DESC`
+			}
 		}
 	} else {
 		if objType != "" {
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1) AND type = $2 ORDER BY created_at DESC`
 			args = []interface{}{userID, objType}
+			addSearch()
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1) AND type = $2` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
 		} else {
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE scope = 'global' OR owner_id = $1 ORDER BY created_at DESC`
 			args = []interface{}{userID}
+			addSearch()
+			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1)` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
 		}
 	}
 
@@ -205,7 +224,7 @@ func typesForZoom(zoom int) []string {
 }
 
 // GetByBBox retrieves geo objects within a bounding box, with optional simplification and clipping
-func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool) ([]model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
 
@@ -253,41 +272,61 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 
 	if isAdmin {
 		if objType != "" {
-			query = `
-				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
-				       ` + geomSQL + `, created_at, updated_at
-				FROM geo_objects
-				WHERE type = $5 AND geometry && ` + bboxSQL + emptyFilter + orderAndLimit + `
-			`
 			args = []interface{}{minLng, minLat, maxLng, maxLat, objType}
-		} else {
+			searchFilter := ""
+			if search != "" {
+				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
+				args = append(args, search)
+			}
 			query = `
 				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
-				WHERE geometry && ` + bboxSQL + zoomFilter + emptyFilter + orderAndLimit + `
+				WHERE type = $5 AND geometry && ` + bboxSQL + searchFilter + emptyFilter + orderAndLimit + `
 			`
+		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat}
+			searchFilter := ""
+			if search != "" {
+				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
+				args = append(args, search)
+			}
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE geometry && ` + bboxSQL + zoomFilter + searchFilter + emptyFilter + orderAndLimit + `
+			`
 		}
 	} else {
 		if objType != "" {
-			query = `
-				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
-				       ` + geomSQL + `, created_at, updated_at
-				FROM geo_objects
-				WHERE (scope = 'global' OR owner_id = $5)
-				  AND type = $6 AND geometry && ` + bboxSQL + emptyFilter + orderAndLimit + `
-			`
 			args = []interface{}{minLng, minLat, maxLng, maxLat, userID, objType}
-		} else {
+			searchFilter := ""
+			if search != "" {
+				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
+				args = append(args, search)
+			}
 			query = `
 				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
 				WHERE (scope = 'global' OR owner_id = $5)
-				  AND geometry && ` + bboxSQL + zoomFilter + emptyFilter + orderAndLimit + `
+				  AND type = $6 AND geometry && ` + bboxSQL + searchFilter + emptyFilter + orderAndLimit + `
 			`
+		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat, userID}
+			searchFilter := ""
+			if search != "" {
+				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
+				args = append(args, search)
+			}
+			query = `
+				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+				       ` + geomSQL + `, created_at, updated_at
+				FROM geo_objects
+				WHERE (scope = 'global' OR owner_id = $5)
+				  AND geometry && ` + bboxSQL + zoomFilter + searchFilter + emptyFilter + orderAndLimit + `
+			`
 		}
 	}
 

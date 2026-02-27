@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"auth-service/internal/config"
 	"auth-service/internal/handler"
@@ -20,20 +21,33 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
-	// Connect to database
+	// Connect to database with retry
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName)
 
-	db, err := sqlx.Connect("postgres", dsn)
+	var db *sqlx.DB
+	var err error
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		db, err = sqlx.Connect("postgres", dsn)
+		if err == nil {
+			if pingErr := db.Ping(); pingErr == nil {
+				break
+			} else {
+				db.Close()
+				err = pingErr
+			}
+		}
+		if i < maxRetries-1 {
+			wait := time.Duration(1<<uint(i)) * time.Second // 1s, 2s, 4s, 8s
+			log.Printf("Failed to connect to database (attempt %d/%d): %v. Retrying in %v...", i+1, maxRetries, err, wait)
+			time.Sleep(wait)
+		}
+	}
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database after %d attempts: %v", maxRetries, err)
 	}
 	defer db.Close()
-
-	// Test database connection
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
-	}
 	log.Println("Connected to database successfully")
 
 	// Initialize JWT token manager

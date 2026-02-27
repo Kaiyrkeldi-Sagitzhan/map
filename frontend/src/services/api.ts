@@ -76,9 +76,10 @@ class ApiService {
   }
 
   // Geo object methods
-  async getGeoObjects(type?: string, bbox?: { minLat: number, minLng: number, maxLat: number, maxLng: number, zoom?: number, clip?: boolean, filterByZoom?: boolean }): Promise<GeoObjectListResponse> {
+  async getGeoObjects(type?: string, bbox?: { minLat: number, minLng: number, maxLat: number, maxLng: number, zoom?: number, clip?: boolean, filterByZoom?: boolean }, search?: string): Promise<GeoObjectListResponse> {
     const params: Record<string, any> = {};
     if (type) params.type = type;
+    if (search) params.search = search;
     if (bbox) {
       params.minLat = bbox.minLat;
       params.minLng = bbox.minLng;

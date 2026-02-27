@@ -13,7 +13,7 @@ import type { DrawTool, EditorFeature } from '../types/editor'
 import { apiService } from '../services/api'
 
 /** Map DrawTool → geoman draw mode string */
-function toolToGeomanMode(tool: DrawTool): string | null {
+function toolToGeomanMode(tool: DrawTool, isShiftHeld: boolean = false): string | null {
     switch (tool) {
         case 'drawPolygon': return 'Polygon'
         case 'drawRectangle': return 'Rectangle'
@@ -21,7 +21,7 @@ function toolToGeomanMode(tool: DrawTool): string | null {
         case 'drawLine': return 'Line'
         case 'freehand': return 'Polygon' // freehand uses polygon mode with freehand option
         case 'marker': return 'Marker'
-        case 'searchArea': return 'Rectangle' // Поиск теперь прямоугольником — это быстрее
+        case 'searchArea': return isShiftHeld ? 'Rectangle' : 'Polygon'
         default: return null
     }
 }
@@ -31,6 +31,7 @@ export function useGeoman() {
     const prevTool = useRef<DrawTool>('select')
     const layerToFeatureId = useRef<Map<L.Layer, string>>(new Map())
     const featureIdToLayer = useRef<Map<string, L.Layer>>(new Map())
+    const isShiftHeld = useRef(false)
 
     const {
         currentTool,
@@ -46,6 +47,22 @@ export function useGeoman() {
     } = useEditorStore()
 
     const searchLayers = useRef<L.Layer[]>([])
+
+    // ─── Track Shift key for searchArea mode ─────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeld.current = true
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeld.current = false
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [])
 
     // ─── Sync search results to map ──────────────────────────
     useEffect(() => {
@@ -159,11 +176,11 @@ export function useGeoman() {
                 allowSelfIntersection: false,
             })
         } else {
-            const geomanMode = toolToGeomanMode(currentTool)
+            const geomanMode = toolToGeomanMode(currentTool, isShiftHeld.current)
             if (geomanMode) {
                 const isSearch = currentTool === 'searchArea'
                 const style = CLASS_STYLES[featureClass]
-                
+
                 map.pm.enableDraw(geomanMode as any, {
                     freehandMode: currentTool === 'freehand',
                     pathOptions: {

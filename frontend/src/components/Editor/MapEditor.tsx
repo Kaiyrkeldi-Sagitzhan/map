@@ -14,6 +14,7 @@ import PropertiesPanel from './PropertiesPanel'
 import CoordinateDisplay from './CoordinateDisplay'
 import GeomanController from './GeomanController'
 import SearchResults from './SearchResults'
+import TextSearch from './TextSearch'
 import ZoomPicker from './ZoomPicker'
 
 // Fix for default marker icon
@@ -50,6 +51,7 @@ const MapEditor = () => {
                     />
 
                     <GeomanController />
+                    <TextSearch />
 
                     {/* Visual enhancements */}
                     <ScaleControl position="bottomleft" />

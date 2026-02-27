@@ -110,6 +110,7 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 
 	// Get type filter from query parameter
 	objType := c.Query("type")
+	search := c.Query("search")
 
 	// Get bbox parameters
 	minLatStr := c.Query("minLat")
@@ -133,9 +134,9 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 		clip := c.Query("clip") == "true"
 		filterByZoom := c.Query("filterByZoom") != "false" // default true
 
-		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom)
+		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search)
 	} else {
-		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType)
+		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType, search)
 	}
 
 	if err != nil {

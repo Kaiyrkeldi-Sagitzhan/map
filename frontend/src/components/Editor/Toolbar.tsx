@@ -134,7 +134,7 @@ export default function Toolbar() {
     return (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1">
             {/* Main toolbar pill */}
-            <div className="flex items-center gap-0.5 bg-white/95 backdrop-blur-xl rounded-full shadow-2xl shadow-black/20 border border-gray-200/60 px-2 py-1.5">
+            <div className="flex items-center gap-0.5 bg-white rounded-full shadow-2xl shadow-black/20 border border-gray-200/60 px-2 py-1.5">
                 {tools.map((tool) => (
                     <button
                         key={tool.id}
@@ -239,7 +239,7 @@ export default function Toolbar() {
 
                     {/* Dropdown menu */}
                     {showClassMenu && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl shadow-black/15 border border-gray-200/60 py-2 min-w-[180px] backdrop-blur-xl">
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl shadow-black/15 border border-gray-200/60 py-2 min-w-[180px]">
                             {featureClasses.map((fc) => (
                                 <button
                                     key={fc}

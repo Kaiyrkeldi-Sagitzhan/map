@@ -26,7 +26,7 @@ const SearchResults: React.FC = () => {
     }
 
     return (
-        <div className="absolute top-20 left-4 z-[1000] w-64 max-h-[40vh] bg-white/90 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 flex flex-col pointer-events-auto">
+        <div className="absolute top-20 left-4 z-[1000] w-64 max-h-[40vh] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col pointer-events-auto">
             <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <Search className="w-3 h-3" />
