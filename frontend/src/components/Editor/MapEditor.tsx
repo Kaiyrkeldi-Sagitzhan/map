@@ -17,6 +17,7 @@ import GeomanController from './GeomanController'
 import SearchResults from './SearchResults'
 import TextSearch from './TextSearch'
 import ZoomPicker from './ZoomPicker'
+import VectorTileLayer from '../Map/VectorTileLayer'
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -75,6 +76,7 @@ const MapEditor = () => {
                         opacity={showMap ? mapOpacity : 0}
                     />
 
+                    <VectorTileLayer />
                     <GeomanController />
                     <TextSearch />
 

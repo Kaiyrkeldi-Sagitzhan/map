@@ -369,3 +369,26 @@ func toResponse(obj *model.GeoObjectWithGeometry) dto.GeoObjectResponse {
 	}
 	return resp
 }
+
+// GetTile coordinates retrieval of vector tiles via cache and repository
+func (s *GeoObjectService) GetTile(ctx context.Context, z, x, y int) ([]byte, error) {
+	if s.cache != nil {
+		tile, err := s.cache.GetTile(ctx, z, x, y)
+		if err == nil && tile != nil {
+			log.Printf("[DEBUG] Tile cache HIT: %d/%d/%d", z, x, y)
+			return tile, nil
+		}
+	}
+
+	tile, err := s.repo.GetTileMVT(ctx, z, x, y)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil && tile != nil {
+		_ = s.cache.SetTile(ctx, z, x, y, tile)
+	}
+
+	log.Printf("[DEBUG] Tile cache MISS: %d/%d/%d (generated %d bytes)", z, x, y, len(tile))
+	return tile, nil
+}

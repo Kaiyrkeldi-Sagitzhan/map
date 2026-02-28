@@ -82,6 +82,7 @@ func main() {
 			mapGroup.GET("/objects/:id", geoObjectHandler.GetByID)
 			mapGroup.PUT("/objects/:id", geoObjectHandler.Update)
 			mapGroup.DELETE("/objects/:id", geoObjectHandler.Delete)
+			mapGroup.GET("/tiles/:z/:x/:y.pbf", geoObjectHandler.GetTile)
 		}
 	}
 

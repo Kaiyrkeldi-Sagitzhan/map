@@ -253,3 +253,26 @@ func (h *GeoObjectHandler) HealthCheck(c *gin.Context) {
 		"service": "map-service",
 	})
 }
+
+// GetTile handles requests for vector tiles (MVT/PBF)
+func (h *GeoObjectHandler) GetTile(c *gin.Context) {
+	z, _ := strconv.Atoi(c.Param("z"))
+	x, _ := strconv.Atoi(c.Param("x"))
+	y, _ := strconv.Atoi(c.Param("y"))
+
+	tile, err := h.service.GetTile(c.Request.Context(), z, x, y)
+	if err != nil {
+		log.Printf("[ERROR] Failed to get tile: %v", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if tile == nil {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	c.Header("Content-Type", "application/x-protobuf")
+	c.Header("Content-Encoding", "gzip")
+	c.Data(http.StatusOK, "application/x-protobuf", tile)
+}

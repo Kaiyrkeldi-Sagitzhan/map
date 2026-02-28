@@ -183,3 +183,19 @@ func (c *RedisCache) SetBBox(ctx context.Context, zoom int, minLat, minLng, maxL
 func (c *RedisCache) Close() error {
 	return c.client.Close()
 }
+
+// GetTile retrieves a cached vector tile (binary)
+func (c *RedisCache) GetTile(ctx context.Context, z, x, y int) ([]byte, error) {
+	key := fmt.Sprintf("tile:%d:%d:%d", z, x, y)
+	val, err := c.client.Get(ctx, key).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	return val, err
+}
+
+// SetTile caches a vector tile (binary) for 24 hours
+func (c *RedisCache) SetTile(ctx context.Context, z, x, y int, data []byte) error {
+	key := fmt.Sprintf("tile:%d:%d:%d", z, x, y)
+	return c.client.Set(ctx, key, data, 24*time.Hour).Err()
+}

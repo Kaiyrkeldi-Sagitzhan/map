@@ -510,3 +510,19 @@ func (r *GeoObjectRepository) GetByOwner(ctx context.Context, ownerID uuid.UUID)
 
 	return objects, nil
 }
+
+// GetTileMVT generates a vector tile (MVT) for the given z, x, y coordinates
+func (r *GeoObjectRepository) GetTileMVT(ctx context.Context, z, x, y int) ([]byte, error) {
+	query := `
+		WITH bounds AS (SELECT ST_TileEnvelope($1, $2, $3) AS geom),
+		mvt_geom AS (
+			SELECT id, name, type, metadata, ST_AsMVTGeom(ST_Transform(geometry, 3857), bounds.geom, 4096, 256, true) AS geom
+			FROM geo_objects, bounds
+			WHERE ST_Intersects(ST_Transform(geometry, 3857), bounds.geom)
+		)
+		SELECT ST_AsMVT(mvt_geom.*, 'objects') FROM mvt_geom;
+	`
+	var tile []byte
+	err := r.db.GetContext(ctx, &tile, query, z, x, y)
+	return tile, err
+}

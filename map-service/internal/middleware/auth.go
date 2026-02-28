@@ -21,28 +21,30 @@ const (
 // JWTAuth creates a JWT authentication middleware
 func JWTAuth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		tokenString := ""
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		
+		if authHeader != "" {
+			// Extract token from "Bearer <token>"
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenString = parts[1]
+			}
+		}
+
+		// Fallback to query parameter
+		if tokenString == "" {
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
 				Error:   "unauthorized",
-				Message: "Authorization header is required",
+				Message: "Authorization token is required (header or query param)",
 			})
 			c.Abort()
 			return
 		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
-				Error:   "unauthorized",
-				Message: "Invalid authorization header format",
-			})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
 
 		// Validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

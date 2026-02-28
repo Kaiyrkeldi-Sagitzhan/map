@@ -111,6 +111,11 @@ class ApiService {
   async deleteGeoObject(id: string): Promise<void> {
     await this.mapClient.delete(`/api/map/objects/${id}`);
   }
+
+  getTileUrl(): string {
+    const token = localStorage.getItem('token');
+    return `${MAP_SERVICE_URL}/api/map/tiles/{z}/{x}/{y}.pbf${token ? `?token=${token}` : ''}`;
+  }
 }
 
 export const apiService = new ApiService();
