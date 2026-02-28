@@ -254,10 +254,8 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 		}
 	}
 
-	// For RAW accuracy and full data, we still need a reasonable limit to prevent DB crash, 
-	// but we increase it to 15,000 objects per request.
-	const maxResults = 15000
-	orderAndLimit := fmt.Sprintf(" LIMIT %d", maxResults)
+	// For RAW accuracy, we return ALL objects without limits as requested.
+	orderAndLimit := ""
 
 	if isAdmin {
 		if objType != "" {

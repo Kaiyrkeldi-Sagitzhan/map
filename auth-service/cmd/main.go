@@ -65,8 +65,8 @@ func main() {
 	// Setup Gin router
 	router := gin.Default()
 
-	// Add CORS middleware
-	router.Use(middleware.CORSMiddleware())
+	// CORS is handled by Nginx gateway
+	// router.Use(middleware.CORSMiddleware())
 
 	// Health check
 	router.GET("/health", authHandler.HealthCheck)
