@@ -49,6 +49,7 @@ const GlobeAnimator = () => {
 
 const MapEditor = () => {
     const showMap = useEditorStore((s) => s.showMap)
+    const mapOpacity = useEditorStore((s) => s.mapOpacity)
     const isLoading = useEditorStore((s) => s.isLoading)
 
     return (
@@ -71,7 +72,7 @@ const MapEditor = () => {
                     <TileLayer
                         url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                        opacity={showMap ? 1 : 0}
+                        opacity={showMap ? mapOpacity : 0}
                     />
 
                     <GeomanController />

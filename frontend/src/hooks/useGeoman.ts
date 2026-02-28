@@ -214,9 +214,15 @@ export function useGeoman() {
             map.removeLayer(layer)
 
             try {
-                // 'custom' filter now acts as "Search All"
+                // 'custom' filter acts as "Search All"
+                // Disabling filterByZoom and clip to get 100% RAW data accuracy
                 const filter = featureClass === 'custom' ? '' : featureClass
-                const res = await apiService.getGeoObjects(filter as any, { ...bbox, zoom, clip: true } as any)
+                const res = await apiService.getGeoObjects(filter as any, { 
+                    ...bbox, 
+                    zoom, 
+                    clip: false, 
+                    filterByZoom: false 
+                } as any)
                 
                 const searchResults: EditorFeature[] = res.objects.map(obj => ({
                     id: crypto.randomUUID(),
@@ -440,49 +446,7 @@ export function useGeoman() {
         })
     }, [selectedFeatureId, features])
 
-    // ─── Load visible objects from backend ──────────────────
-    const loadVisibleObjects = useCallback(async () => {
-        if (!map) return
-        const store = useEditorStore.getState()
-        store.setLoading(true)
-        try {
-            const bounds = map.getBounds()
-            const zoom = map.getZoom()
-            const bbox = {
-                minLat: bounds.getSouth(),
-                minLng: bounds.getWest(),
-                maxLat: bounds.getNorth(),
-                maxLng: bounds.getEast(),
-                zoom,
-                clip: true,
-                filterByZoom: true,
-            }
-            const res = await apiService.getGeoObjects('', bbox)
-            const existingBackendIds = new Set(
-                store.features.filter(f => f.backendId).map(f => f.backendId)
-            )
-            const newFeatures: EditorFeature[] = res.objects
-                .filter(obj => !existingBackendIds.has(obj.id as any))
-                .map(obj => ({
-                    id: crypto.randomUUID(),
-                    name: obj.name,
-                    featureClass: (obj.type || 'custom') as any,
-                    description: obj.description || '',
-                    style: (obj.metadata as any)?.style || getSafeStyle(obj.type),
-                    visible: true,
-                    locked: false,
-                    geometry: obj.geometry as GeoJSON.Geometry,
-                    backendId: obj.id as any,
-                }))
-            newFeatures.forEach(f => store.addFeature(f))
-        } catch (err) {
-            console.error('Failed to load visible objects:', err)
-        } finally {
-            store.setLoading(false)
-        }
-    }, [map])
-
-    return { layerToFeatureId, featureIdToLayer, loadVisibleObjects }
+    return { layerToFeatureId, featureIdToLayer }
 }
 
 // ─── Backend persistence helper ────────────────────────────

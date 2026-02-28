@@ -20,6 +20,8 @@ export default function LayersPanel() {
         toggleLayerExpand,
         toggleFeatureVisibility,
         toggleFeatureLock,
+        mapOpacity,
+        setMapOpacity,
     } = useEditorStore()
 
     const handleExportAll = () => {
@@ -50,14 +52,33 @@ export default function LayersPanel() {
                     </svg>
                     Слои
                 </h2>
-                <button 
-                    onClick={handleExportAll}
-                    disabled={features.length === 0}
-                    className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 disabled:opacity-30 disabled:hover:bg-transparent"
-                    title="Экспорт всего проекта"
-                >
-                    <Download className="w-4 h-4" />
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={handleExportAll}
+                        disabled={features.length === 0}
+                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Экспорт всего проекта"
+                    >
+                        <Download className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Map Opacity Control */}
+            <div className="px-4 py-2 border-b border-gray-100/50 bg-gray-50/30">
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Прозрачность карты</span>
+                    <span className="text-[10px] font-bold text-indigo-600">{Math.round(mapOpacity * 100)}%</span>
+                </div>
+                <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={mapOpacity}
+                    onChange={(e) => setMapOpacity(parseFloat(e.target.value))}
+                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
             </div>
 
             {/* Tree view */}

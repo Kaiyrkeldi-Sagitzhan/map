@@ -39,10 +39,11 @@ interface EditorState {
     
     // UI State
     showMap: boolean
+    mapOpacity: number
     isLoading: boolean
 
     // Map action registered by useGeoman (inside MapContainer context)
-    loadVisibleObjects: (() => Promise<void>) | null
+    // Removed loadVisibleObjects to prevent freezing
 
     // ─── Actions ─────────────────────────────────────────────
     setTool: (tool: DrawTool) => void
@@ -50,8 +51,8 @@ interface EditorState {
     setSelectedFeature: (id: string | null) => void
     setMouseCoords: (coords: MouseCoords | null) => void
     setShowMap: (show: boolean) => void
+    setMapOpacity: (opacity: number) => void
     setLoading: (loading: boolean) => void
-    setLoadVisibleObjects: (fn: (() => Promise<void>) | null) => void
 
     // Feature CRUD
     addFeature: (feature: EditorFeature) => void
@@ -105,8 +106,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     mouseCoords: null,
     showMap: true,
+    mapOpacity: 1.0,
     isLoading: false,
-    loadVisibleObjects: null,
 
     // ─── Tool / Class ────────────────────────────────────────
     setTool: (tool) => set({ currentTool: tool }),
@@ -114,8 +115,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setSelectedFeature: (id) => set({ selectedFeatureId: id }),
     setMouseCoords: (coords) => set({ mouseCoords: coords }),
     setShowMap: (show) => set({ showMap: show }),
+    setMapOpacity: (opacity) => set({ mapOpacity: opacity }),
     setLoading: (loading) => set({ isLoading: loading }),
-    setLoadVisibleObjects: (fn) => set({ loadVisibleObjects: fn }),
 
     // ─── Feature CRUD ────────────────────────────────────────
     addFeature: (feature) => {

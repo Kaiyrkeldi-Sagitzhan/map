@@ -15,6 +15,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
+      - ./database/03-init_data.sh:/docker-entrypoint-initdb.d/03-init_data.sh
+      - ./database/data_dump.sql.gz.bak:/docker-entrypoint-initdb.d/data_dump.sql.gz.bak
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kzmap_user -d kzmap"]
       interval: 10s
@@ -98,18 +100,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # MapSCII WebSocket bridge
-  mapscii:
-    build:
-      context: ./mapscii-server
-      dockerfile: Dockerfile
-    container_name: kzmap-mapscii
-    ports:
-      - "9870:9870"
-    networks:
-      - kzmap-network
-    restart: unless-stopped
 
   # Frontend (React + Vite)
   frontend:

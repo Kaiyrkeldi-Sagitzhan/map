@@ -72,12 +72,6 @@ const typeFields: Record<ObjectType, FormField[]> = {
         { key: 'prominence_m', label: 'Prominence', type: 'number', placeholder: '0', unit: 'm' },
         { key: 'first_ascent', label: 'First ascent year', type: 'number', placeholder: 'e.g. 1956' },
     ],
-    region: [
-        { key: 'area_km2', label: 'Area', type: 'number', placeholder: '0', unit: 'km²' },
-        { key: 'population', label: 'Population', type: 'number', placeholder: '0' },
-        { key: 'capital', label: 'Capital city', type: 'text', placeholder: 'e.g. Astana' },
-        { key: 'established', label: 'Established year', type: 'number', placeholder: 'e.g. 1991' },
-    ],
     city: [
         { key: 'population', label: 'Population', type: 'number', placeholder: '0' },
         { key: 'founded', label: 'Founded year', type: 'number', placeholder: 'e.g. 1830' },
@@ -118,18 +112,6 @@ const typeFields: Record<ObjectType, FormField[]> = {
         },
         { key: 'established', label: 'Established year', type: 'number', placeholder: 'e.g. 1991' },
     ],
-    administrative: [
-        {
-            key: 'admin_level', label: 'Admin level', type: 'select', options: [
-                { value: '', label: 'Select...' },
-                { value: 'country', label: 'Country' },
-                { value: 'state', label: 'State/Province' },
-                { value: 'county', label: 'County/District' },
-                { value: 'city', label: 'City/Municipality' },
-            ]
-        },
-        { key: 'code', label: 'ISO/Admin code', type: 'text', placeholder: 'e.g. KZ-ALA' },
-    ],
     other: [
         { key: 'category', label: 'Category', type: 'text', placeholder: 'e.g. landmark, POI' },
     ],
@@ -154,15 +136,6 @@ const TypeIcon = ({ type, className = 'w-5 h-5' }: { type: ObjectType; className
             <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 22 21 2 21" />
                 <polyline points="7 14 12 9 17 14" />
-            </svg>
-        ),
-        region: (
-            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="3" y1="15" x2="21" y2="15" />
-                <line x1="9" y1="3" x2="9" y2="21" />
-                <line x1="15" y1="3" x2="15" y2="21" />
             </svg>
         ),
         city: (
@@ -193,13 +166,6 @@ const TypeIcon = ({ type, className = 'w-5 h-5' }: { type: ObjectType; className
                 <line x1="5" y1="12" x2="19" y2="12" strokeDasharray="2 3" />
             </svg>
         ),
-        administrative: (
-            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="M12 8v4" />
-                <path d="M12 16h.01" />
-            </svg>
-        ),
         other: (
             <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="2" />
@@ -215,11 +181,9 @@ const typeLabels: Record<ObjectType, string> = {
     river: 'River',
     lake: 'Lake',
     mountain: 'Mountain',
-    region: 'Region',
     city: 'City',
     road: 'Road',
     boundary: 'Boundary',
-    administrative: 'Administrative',
     other: 'Other',
 }
 
@@ -227,11 +191,9 @@ const typeColors: Record<ObjectType, string> = {
     river: '#3b82f6',
     lake: '#0ea5e9',
     mountain: '#64748b',
-    region: '#8b5cf6',
     city: '#f59e0b',
     road: '#6b7280',
     boundary: '#10b981',
-    administrative: '#6366f1',
     other: '#6366f1',
 }
 

@@ -20,8 +20,8 @@ export type FeatureClass =
     | 'forest'
     | 'road'
     | 'building'
-    | 'region'
-    | 'administrative'
+    | 'city'
+    | 'other'
     | 'custom'
 
 export interface ClassStyle {
@@ -38,8 +38,8 @@ export const CLASS_STYLES: Record<FeatureClass, ClassStyle> = {
     forest: { color: '#166534', fillColor: '#22c55e', weight: 1, fillOpacity: 0.5 },
     road: { color: '#0f172a', fillColor: 'transparent', weight: 3, fillOpacity: 0 },
     building: { color: '#4c1d95', fillColor: '#8b5cf6', weight: 1, fillOpacity: 0.5 },
-    region: { color: '#334155', fillColor: '#94a3b8', weight: 2, fillOpacity: 0.1 },
-    administrative: { color: '#6366f1', fillColor: 'transparent', weight: 2, fillOpacity: 0 },
+    city: { color: '#f59e0b', fillColor: '#fbaf17', weight: 2, fillOpacity: 0.3 },
+    other: { color: '#6366f1', fillColor: '#818cf8', weight: 1.5, fillOpacity: 0.4 },
     custom: { color: '#4338ca', fillColor: '#6366f1', weight: 1.5, fillOpacity: 0.5 },
 }
 
@@ -53,8 +53,8 @@ export const CLASS_LABELS: Record<FeatureClass, string> = {
     forest: 'Лес',
     road: 'Дорога',
     building: 'Здание',
-    region: 'Область',
-    administrative: 'Админ. граница',
+    city: 'Населенный пункт',
+    other: 'Точки интереса (POI)',
     custom: 'Все объекты (Разведка)',
 }
 

@@ -120,11 +120,9 @@ const layerColors: Record<ObjectType, string> = {
   river: '#3b82f6',
   lake: '#0ea5e9',
   mountain: '#64748b',
-  region: '#8b5cf6',
   city: '#f59e0b',
   road: '#6b7280',
   boundary: '#10b981',
-  administrative: '#6366f1',
   other: '#6366f1',
 }
 
@@ -135,14 +133,12 @@ export default function MapView() {
     river: true,
     lake: true,
     mountain: true,
-    region: true,
     city: true,
     road: true,
     boundary: true,
-    administrative: true,
     other: true,
   })
-  const [selectedType, setSelectedType] = useState<ObjectType>('region')
+  const [selectedType, setSelectedType] = useState<ObjectType>('boundary')
   const [showDrawControl, setShowDrawControl] = useState(false)
   const [mapMode, setMapMode] = useState<'global' | 'private'>('global')
   const [focusKZ, setFocusKZ] = useState(false)
@@ -387,11 +383,9 @@ export default function MapView() {
                   <option value="river">River</option>
                   <option value="lake">Lake</option>
                   <option value="mountain">Mountain</option>
-                  <option value="region">Region</option>
                   <option value="city">City</option>
                   <option value="road">Road</option>
                   <option value="boundary">Boundary</option>
-                  <option value="administrative">Administrative</option>
                   <option value="other">Other</option>
                 </select>
               )}

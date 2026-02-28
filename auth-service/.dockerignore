@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dockerignore
+*.log
+.vscode
+.idea
+.DS_Store
+bin/
+obj/
+*.exe
+*.test

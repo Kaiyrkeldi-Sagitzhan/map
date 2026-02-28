@@ -40,11 +40,9 @@ export type ObjectType =
   | 'river' 
   | 'lake' 
   | 'mountain' 
-  | 'region' 
   | 'city' 
   | 'road' 
   | 'boundary' 
-  | 'administrative'
   | 'other';
 
 export interface GeoObjectListResponse {
@@ -75,11 +73,9 @@ export interface LayerVisibility {
   river: boolean;
   lake: boolean;
   mountain: boolean;
-  region: boolean;
   city: boolean;
   road: boolean;
   boundary: boolean;
-  administrative: boolean;
   other: boolean;
 }
 

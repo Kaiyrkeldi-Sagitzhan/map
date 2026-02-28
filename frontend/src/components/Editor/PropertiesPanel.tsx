@@ -10,7 +10,7 @@ import type { FeatureClass, ClassStyle } from '../../types/editor'
 import { saveAs } from 'file-saver'
 import { apiService } from '../../services/api'
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'region', 'administrative', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
 
 export default function PropertiesPanel() {
     const {

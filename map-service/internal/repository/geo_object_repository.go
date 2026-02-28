@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 
 	"map-service/internal/model"
 
@@ -209,48 +208,37 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 // At low zoom, only large features are shown; at high zoom, everything is visible.
 func typesForZoom(zoom int) []string {
 	switch {
-	case zoom <= 4:
-		return []string{"region", "boundary"}
-	case zoom <= 7:
-		return []string{"region", "boundary", "river", "lake", "road"}
-	case zoom <= 10:
-		return []string{"region", "boundary", "river", "lake", "road", "forest", "mountain", "city", "relief"}
+	case zoom <= 6:
+		// National level: only boundaries and regions
+		return []string{"region", "boundary", "administrative"}
+	case zoom <= 9:
+		// Country/Region level: large water and main roads
+		return []string{"region", "boundary", "administrative", "river", "lake", "road"}
+	case zoom <= 12:
+		// District level: add forests and mountains
+		return []string{"region", "boundary", "administrative", "river", "lake", "road", "forest", "mountain", "city"}
 	case zoom <= 13:
-		return []string{"region", "boundary", "river", "lake", "road", "forest", "mountain", "city", "relief", "custom", "other"}
+		// City approach: everything except buildings
+		return []string{"region", "boundary", "administrative", "river", "lake", "road", "forest", "mountain", "city", "custom", "other"}
 	default:
-		// zoom 14+: everything including buildings
+		// zoom 14+: everything including buildings (only for visible area)
 		return nil // nil means no filter
 	}
 }
 
-// GetByBBox retrieves geo objects within a bounding box, with optional simplification and clipping
+// GetByBBox retrieves geo objects within a bounding box with 100% geometric accuracy
 func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
 
-	// Calculate simplification tolerance
-	tolerance := 0.0
-	if zoom < 16 {
-		tolerance = 0.1 / math.Pow(2, float64(zoom))
-	}
-
 	// BBox coordinates
 	bboxSQL := "ST_MakeEnvelope($1, $2, $3, $4, 4326)"
 
-	geomColumn := "ST_MakeValid(geometry)"
-	if clip {
-		geomColumn = fmt.Sprintf("ST_CollectionExtract(ST_Intersection(ST_MakeValid(geometry), %s))", bboxSQL)
-	}
+	// RAW GEOMETRY: No simplification, no clipping, 100% accuracy
+	geomSQL := "ST_AsGeoJSON(ST_MakeValid(geometry)) as geometry"
 
-	geomSQL := fmt.Sprintf("ST_AsGeoJSON(ST_SimplifyPreserveTopology(%s, %f)) as geometry", geomColumn, tolerance)
-
-	// Filter out empty/invalid geometries
-	emptyFilter := ""
-	if clip {
-		emptyFilter = fmt.Sprintf(" AND NOT ST_IsEmpty(ST_Intersection(ST_MakeValid(geometry), %s))", bboxSQL)
-	}
-
-	// Build zoom-based type filter when no explicit type is passed and filterByZoom is enabled
+	// Build type filter: if objType is empty and filterByZoom is true, apply zoom logic.
+	// However, if we want "All Objects" without zoom restrictions, we skip this.
 	zoomFilter := ""
 	if objType == "" && filterByZoom {
 		allowed := typesForZoom(zoom)
@@ -266,9 +254,10 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 		}
 	}
 
-	// Limit results to prevent overload; order by area descending (largest first)
-	const maxResults = 5000
-	orderAndLimit := fmt.Sprintf(" ORDER BY ST_Area(geometry) DESC LIMIT %d", maxResults)
+	// For RAW accuracy and full data, we still need a reasonable limit to prevent DB crash, 
+	// but we increase it to 15,000 objects per request.
+	const maxResults = 15000
+	orderAndLimit := fmt.Sprintf(" LIMIT %d", maxResults)
 
 	if isAdmin {
 		if objType != "" {
@@ -282,7 +271,7 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
-				WHERE type = $5 AND geometry && ` + bboxSQL + searchFilter + emptyFilter + orderAndLimit + `
+				WHERE type = $5 AND geometry && ` + bboxSQL + searchFilter + orderAndLimit + `
 			`
 		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat}
@@ -295,7 +284,7 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 				SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
-				WHERE geometry && ` + bboxSQL + zoomFilter + searchFilter + emptyFilter + orderAndLimit + `
+				WHERE geometry && ` + bboxSQL + zoomFilter + searchFilter + orderAndLimit + `
 			`
 		}
 	} else {
@@ -311,7 +300,7 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
 				WHERE (scope = 'global' OR owner_id = $5)
-				  AND type = $6 AND geometry && ` + bboxSQL + searchFilter + emptyFilter + orderAndLimit + `
+				  AND type = $6 AND geometry && ` + bboxSQL + searchFilter + orderAndLimit + `
 			`
 		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat, userID}
@@ -325,7 +314,7 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 				       ` + geomSQL + `, created_at, updated_at
 				FROM geo_objects
 				WHERE (scope = 'global' OR owner_id = $5)
-				  AND geometry && ` + bboxSQL + zoomFilter + searchFilter + emptyFilter + orderAndLimit + `
+				  AND geometry && ` + bboxSQL + zoomFilter + searchFilter + orderAndLimit + `
 			`
 		}
 	}

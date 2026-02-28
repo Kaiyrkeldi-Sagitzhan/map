@@ -93,10 +93,10 @@ const tools: ToolDef[] = [
     },
 ]
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'region', 'administrative', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
 
 export default function Toolbar() {
-    const { currentTool, setTool, featureClass, setFeatureClass, showMap, setShowMap, isLoading, loadVisibleObjects } = useEditorStore()
+    const { currentTool, setTool, featureClass, setFeatureClass, showMap, setShowMap } = useEditorStore()
     const [showClassMenu, setShowClassMenu] = useState(false)
     const classMenuRef = useRef<HTMLDivElement>(null)
 
@@ -124,12 +124,11 @@ export default function Toolbar() {
                 case 'f': setTool('freehand'); break
                 case 'm': setTool('marker'); break
                 case 's': setTool('searchArea'); break
-                case 'a': loadVisibleObjects?.(); break
             }
         }
         window.addEventListener('keydown', handler)
         return () => window.removeEventListener('keydown', handler)
-    }, [setTool, loadVisibleObjects])
+    }, [setTool])
 
     return (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1">
@@ -191,23 +190,6 @@ export default function Toolbar() {
                         <path d="M3 6h18" />
                         <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
                         <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    </svg>
-                </button>
-
-                <button
-                    onClick={() => loadVisibleObjects?.()}
-                    disabled={isLoading}
-                    title="Show All (A)"
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-                        isLoading
-                            ? 'text-indigo-400 bg-indigo-50 animate-pulse'
-                            : 'text-emerald-600 hover:bg-emerald-50'
-                    }`}
-                >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="2" y1="12" x2="22" y2="12" />
-                        <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
                     </svg>
                 </button>
 
