@@ -303,7 +303,7 @@ export default function PropertiesPanel() {
                 <div className="px-4 py-3 border-b border-gray-50">
                     <label className="text-xs font-medium text-gray-500 mb-1 block">Описание</label>
                     <textarea
-                        rows={6}
+                        rows={4}
                         placeholder="Подробное описание реки, озера, рельефа..."
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-none transition-colors"
                         value={description}
@@ -311,6 +311,24 @@ export default function PropertiesPanel() {
                         onBlur={handleDescBlur}
                     />
                 </div>
+
+                {/* Advanced Metadata */}
+                {feature.metadata && Object.keys(feature.metadata).length > 0 && (
+                    <div className="px-4 py-3 border-b border-gray-50 bg-indigo-50/20">
+                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 block">Доп. сведения (OSM)</label>
+                        <div className="space-y-1.5">
+                            {Object.entries(feature.metadata).map(([key, value]) => {
+                                if (value === null || value === '' || key === 'osm_id' || key === 'code') return null
+                                return (
+                                    <div key={key} className="flex justify-between text-[11px]">
+                                        <span className="text-gray-400 font-medium">{key}:</span>
+                                        <span className="text-gray-700 font-semibold">{String(value)}</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Export */}
                 <div className="px-4 py-3">

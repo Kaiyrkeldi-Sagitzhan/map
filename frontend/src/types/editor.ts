@@ -62,6 +62,68 @@ export function getSafeLabel(fc: string): string {
     return CLASS_LABELS[fc as FeatureClass] || 'Объект'
 }
 
+/** 
+ * Advanced Cartography Engine 
+ * Calculates style based on feature class and OSM metadata (fclass, bridge, etc.)
+ */
+export function getAdvancedStyle(featureClass: FeatureClass, metadata: any = {}, baseStyle?: ClassStyle) {
+    const meta = metadata || {}
+    const fclass = meta.fclass || ''
+    const fallback = baseStyle || CLASS_STYLES[featureClass] || CLASS_STYLES.custom
+    
+    let color = fallback.color
+    let fillColor = fallback.fillColor
+    let weight = fallback.weight
+    let fillOpacity = fallback.fillOpacity
+    let dashArray: string | undefined = undefined
+
+    // 1. Smart Road Styling
+    if (featureClass === 'road') {
+        switch(fclass) {
+            case 'motorway': color = '#f59e0b'; weight = 7; break;
+            case 'trunk':
+            case 'primary': color = '#fbbf24'; weight = 5; break;
+            case 'secondary': color = '#fcd34d'; weight = 3.5; break;
+            case 'tertiary': color = '#fde68a'; weight = 2.5; break;
+            case 'residential': color = '#cbd5e1'; weight = 1.2; break;
+            case 'rail':
+            case 'railway': color = '#475569'; weight = 2; dashArray = '5, 5'; break;
+            default: color = '#94a3b8'; weight = 1;
+        }
+        if (meta.bridge === 'T') weight += 2
+        if (meta.tunnel === 'T') { dashArray = '3, 3'; color = '#cbd5e1' }
+    } 
+    
+    // 2. Smart Building Styling
+    else if (featureClass === 'building') {
+        fillOpacity = 0.8
+        switch(fclass) {
+            case 'apartments':
+            case 'residential': fillColor = '#e2e8f0'; break;
+            case 'industrial':
+            case 'warehouse': fillColor = '#cbd5e1'; break;
+            case 'commercial':
+            case 'retail': fillColor = '#ffedd5'; break;
+            case 'school':
+            case 'hospital': fillColor = '#fee2e2'; break;
+            default: fillColor = '#f1f5f9';
+        }
+    }
+
+    // 3. Smart Water/Forest/City
+    else if (featureClass === 'lake' && fclass === 'reservoir') {
+        fillColor = '#0369a1'
+    } else if (featureClass === 'city') {
+        fillColor = 'transparent'
+        fillOpacity = 0.05
+        weight = 1
+        color = '#f59e0b'
+        dashArray = '10, 5'
+    }
+
+    return { color, fillColor, weight, fillOpacity, dashArray }
+}
+
 // ─── Editor Feature (wraps GeoJSON Feature) ────────────────
 export interface EditorFeature {
     id: string
@@ -74,6 +136,8 @@ export interface EditorFeature {
     geometry: GeoJSON.Geometry
     /** Backend ID if persisted, undefined for new unsaved features */
     backendId?: string
+    /** Additional OSM data like fclass */
+    metadata?: Record<string, any>
 }
 
 // ─── Layer Tree Node ───────────────────────────────────────

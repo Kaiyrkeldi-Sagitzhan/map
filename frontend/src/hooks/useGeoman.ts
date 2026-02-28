@@ -8,7 +8,7 @@ import L from 'leaflet'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import { useEditorStore } from '../store/editorStore'
-import { CLASS_STYLES, getSafeStyle } from '../types/editor'
+import { CLASS_STYLES, getSafeStyle, getAdvancedStyle } from '../types/editor'
 import type { DrawTool, EditorFeature } from '../types/editor'
 import { apiService } from '../services/api'
 
@@ -19,7 +19,7 @@ function toolToGeomanMode(tool: DrawTool, isShiftHeld: boolean = false): string 
         case 'drawRectangle': return 'Rectangle'
         case 'drawCircle': return 'Circle'
         case 'drawLine': return 'Line'
-        case 'freehand': return 'Polygon' // freehand uses polygon mode with freehand option
+        case 'freehand': return 'Polygon' 
         case 'marker': return 'Marker'
         case 'searchArea': return isShiftHeld ? 'Rectangle' : 'Polygon'
         default: return null
@@ -48,14 +48,10 @@ export function useGeoman() {
 
     const searchLayers = useRef<L.Layer[]>([])
 
-    // ─── Track Shift key for searchArea mode ─────────────────
+    // ─── Track Shift key ─────────────────────────────────────
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Shift') isShiftHeld.current = true
-        }
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'Shift') isShiftHeld.current = false
-        }
+        const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Shift') isShiftHeld.current = true }
+        const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') isShiftHeld.current = false }
         window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
         return () => {
@@ -67,74 +63,72 @@ export function useGeoman() {
     // ─── Sync search results to map ──────────────────────────
     useEffect(() => {
         if (!map) return
-
-        // Clear old search layers
         searchLayers.current.forEach(l => map.removeLayer(l))
         searchLayers.current = []
 
-        // Add search results as temporary layers
         searchResults.forEach(f => {
-            const isLine = f.featureClass === 'road' || 
-                           f.featureClass === 'river' || 
-                           f.geometry.type === 'LineString' || 
-                           f.geometry.type === 'MultiLineString'
-            
+            const isLine = f.featureClass === 'road' || f.featureClass === 'river'
+            const style = getAdvancedStyle(f.featureClass, f.metadata, f.style)
+            const fclass = f.metadata?.fclass || ''
+
             const layer = L.geoJSON(
                 { type: 'Feature', properties: {}, geometry: f.geometry } as GeoJSON.Feature,
                 {
+                    smoothFactor: 0,
                     style: () => ({
-                        color: f.style.color,
-                        fillColor: isLine ? 'transparent' : f.style.fillColor,
-                        fillOpacity: isLine ? 0 : 1, 
-                        weight: f.style.weight,
-                        fill: !isLine
-                    })
-                }
+                        color: style.color,
+                        fillColor: isLine ? 'transparent' : style.fillColor,
+                        fillOpacity: isLine ? 0 : style.fillOpacity, 
+                        weight: style.weight,
+                        fill: !isLine,
+                        dashArray: style.dashArray,
+                        noClip: true
+                    }),
+                    pointToLayer: (_: any, latlng: any) => {
+                        let iconHtml = '<div class="w-3 h-3 rounded-full bg-indigo-500 border border-white shadow-sm"></div>'
+                        if (fclass === 'hospital' || fclass === 'pharmacy') iconHtml = '🏥'
+                        else if (fclass === 'school' || fclass === 'university') iconHtml = '🎓'
+                        else if (fclass === 'restaurant' || fclass === 'cafe') iconHtml = '🍴'
+                        else if (fclass === 'hotel') iconHtml = '🏨'
+                        else if (f.metadata?.population > 100000) iconHtml = `<div class="px-2 py-0.5 bg-white/90 rounded border border-gray-200 text-[10px] font-bold shadow-sm text-black">${f.name}</div>`
+
+                        return L.marker(latlng, {
+                            icon: L.divIcon({
+                                html: `<div class="flex items-center justify-center">${iconHtml}</div>`,
+                                className: '',
+                                iconSize: [20, 20]
+                            })
+                        })
+                    }
+                } as any
             )
 
             layer.eachLayer(l => {
                 l.on('click', (e) => {
                    L.DomEvent.stopPropagation(e)
-                   // When clicking a search result, maybe ask if user wants to add it to project
                    if (confirm(`Добавить "${f.name}" в проект?`)) {
-                       addFeature({ ...f, id: crypto.randomUUID() })
-                       // Save to backend
-                       saveFeatureToBackend({ ...f, id: crypto.randomUUID() })
+                       const newF = { ...f, id: crypto.randomUUID() }
+                       addFeature(newF)
+                       saveFeatureToBackend(newF)
                    }
                 })
                 l.addTo(map)
                 searchLayers.current.push(l)
             })
         })
-    }, [map, searchResults])
+    }, [map, searchResults, addFeature])
 
     // ─── Initialize geoman ──────────────────────────────────
     useEffect(() => {
         if (!map) return
-
-        // Настраиваем geoman
         map.pm.setGlobalOptions({
-            snappable: currentTool !== 'searchArea', // Отключаем магнит при поиске для скорости
+            snappable: currentTool !== 'searchArea',
             snapDistance: 3, 
             allowSelfIntersection: false,
-            templineStyle: { 
-                color: currentTool === 'searchArea' ? 'transparent' : '#6366f1', 
-                weight: currentTool === 'searchArea' ? 0 : 1.5 
-            },
-            hintlineStyle: { 
-                color: currentTool === 'searchArea' ? 'transparent' : '#6366f1', 
-                weight: currentTool === 'searchArea' ? 0 : 1.5, 
-                dashArray: '5,5' 
-            },
-            pathOptions: {
-                color: currentTool === 'searchArea' ? '#6366f1' : '#6366f1',
-                fillColor: 'transparent', 
-                fillOpacity: 0,
-                weight: currentTool === 'searchArea' ? 1 : 1.5,
-            },
+            templineStyle: { color: '#6366f1', weight: 2 },
+            hintlineStyle: { color: '#6366f1', weight: 2, dashArray: '5,5' },
+            pathOptions: { color: '#6366f1', fillColor: 'transparent', fillOpacity: 0, weight: 2 },
         })
-
-        // Disable default toolbar — we render our own
         map.pm.addControls({
             position: 'topleft',
             drawMarker: false,
@@ -150,182 +144,127 @@ export function useGeoman() {
             removalMode: false,
             rotateMode: false,
         })
-    }, [map])
+    }, [map, currentTool])
 
-    // ─── Track mouse coords ─────────────────────────────────
+    // ─── Track mouse ────────────────────────────────────────
     useEffect(() => {
         if (!map) return
-        const handler = (e: L.LeafletMouseEvent) => {
-            setMouseCoords({ lat: e.latlng.lat, lng: e.latlng.lng })
-        }
+        const handler = (e: L.LeafletMouseEvent) => { setMouseCoords({ lat: e.latlng.lat, lng: e.latlng.lng }) }
         map.on('mousemove', handler)
         return () => { map.off('mousemove', handler) }
     }, [map, setMouseCoords])
 
-    // ─── Sync draw mode with currentTool ─────────────────────
+    // ─── Sync draw mode ──────────────────────────────────────
     useEffect(() => {
         if (!map) return
-
-        // Disable previous mode
         map.pm.disableDraw()
         map.pm.disableGlobalEditMode()
 
         if (currentTool === 'select') {
-            // Enable edit mode so users can click to select
-            map.pm.enableGlobalEditMode({
-                allowSelfIntersection: false,
-            })
+            map.pm.enableGlobalEditMode({ allowSelfIntersection: false })
         } else {
             const geomanMode = toolToGeomanMode(currentTool, isShiftHeld.current)
             if (geomanMode) {
-                const isSearch = currentTool === 'searchArea'
                 const style = CLASS_STYLES[featureClass]
-
                 map.pm.enableDraw(geomanMode as any, {
                     freehandMode: currentTool === 'freehand',
                     pathOptions: {
-                        color: isSearch ? 'transparent' : style.color,
+                        color: currentTool === 'searchArea' ? '#6366f1' : style.color,
                         fillColor: 'transparent',
                         fillOpacity: 0,
-                        weight: isSearch ? 0 : style.weight,
+                        weight: currentTool === 'searchArea' ? 1 : style.weight,
                     },
                 })
             }
         }
-
         prevTool.current = currentTool
     }, [map, currentTool, featureClass])
 
     // ─── Handle pm:create ────────────────────────────────────
     const handleCreate = useCallback(async (e: any) => {
         const layer = e.layer as L.Layer
-
         if (currentTool === 'searchArea') {
             const bounds = (layer as L.Polygon).getBounds()
             const zoom = map.getZoom()
             const bbox = {
-                minLat: bounds.getSouth(),
-                minLng: bounds.getWest(),
-                maxLat: bounds.getNorth(),
-                maxLng: bounds.getEast(),
+                minLat: bounds.getSouth(), minLng: bounds.getWest(),
+                maxLat: bounds.getNorth(), maxLng: bounds.getEast(),
             }
-
-            // Immediately remove the search polygon from map so it's transparent
             map.removeLayer(layer)
-
             try {
-                // 'custom' filter acts as "Search All"
-                // Disabling filterByZoom and clip to get 100% RAW data accuracy
                 const filter = featureClass === 'custom' ? '' : featureClass
                 const res = await apiService.getGeoObjects(filter as any, { 
-                    ...bbox, 
-                    zoom, 
-                    clip: false, 
-                    filterByZoom: false 
+                    ...bbox, zoom, clip: false, filterByZoom: false 
                 } as any)
-                
-                const searchResults: EditorFeature[] = res.objects.map(obj => ({
+                const results: EditorFeature[] = res.objects.map(obj => ({
                     id: crypto.randomUUID(),
                     name: obj.name,
                     featureClass: (obj.type || 'custom') as any,
                     description: obj.description || '',
                     style: (obj.metadata as any)?.style || getSafeStyle(obj.type),
-                    visible: true,
-                    locked: false,
+                    visible: true, locked: false,
                     geometry: obj.geometry as GeoJSON.Geometry,
                     backendId: obj.id,
+                    metadata: obj.metadata as any,
                 }))
-
-                // Set search results temporarily
-                useEditorStore.getState().setSearchResults(searchResults)
-            } catch (err) {
-                console.error('Search failed:', err)
-            }
+                useEditorStore.getState().setSearchResults(results)
+            } catch (err) { console.error('Search failed:', err) }
             return
         }
 
-        // Standard creation logic
         const geoJson = (layer as any).toGeoJSON() as GeoJSON.Feature
         const style = CLASS_STYLES[featureClass]
         const newFeature: EditorFeature = {
             id: crypto.randomUUID(),
             name: `${featureClass.charAt(0).toUpperCase() + featureClass.slice(1)} ${Date.now().toString(36)}`,
-            featureClass,
-            description: '',
-            style: { ...style },
-            visible: true,
-            locked: false,
-            geometry: geoJson.geometry,
+            featureClass, description: '', style: { ...style },
+            visible: true, locked: false, geometry: geoJson.geometry,
         }
 
-        // Register the leaflet layer ↔ feature mapping
         layerToFeatureId.current.set(layer, newFeature.id)
         featureIdToLayer.current.set(newFeature.id, layer)
-
-        // Style the layer
         if ('setStyle' in layer) {
             (layer as L.Path).setStyle({
-                color: style.color,
-                fillColor: style.fillColor,
-                fillOpacity: style.fillOpacity,
-                weight: style.weight,
+                color: style.color, fillColor: style.fillColor,
+                fillOpacity: style.fillOpacity, weight: style.weight,
             })
         }
-
-        // On click → select
         layer.on('click', () => {
             const fid = layerToFeatureId.current.get(layer)
             if (fid) setSelectedFeature(fid)
         })
-
         addFeature(newFeature)
-
-        // Persist to backend
         saveFeatureToBackend(newFeature)
     }, [currentTool, map, featureClass, addFeature, setSelectedFeature])
 
-    // ─── Handle pm:edit ──────────────────────────────────────
     const handleEdit = useCallback((e: any) => {
         const layer = e.layer as L.Layer
         const fid = layerToFeatureId.current.get(layer)
         if (!fid) return
-
         const geoJson = (layer as any).toGeoJSON() as GeoJSON.Feature
         updateFeature(fid, { geometry: geoJson.geometry })
-
-        // Persist update
         const feature = useEditorStore.getState().features.find(f => f.id === fid)
         if (feature?.backendId) {
-            apiService.updateGeoObject(feature.backendId, {
-                geometry: geoJson.geometry,
-            }).catch(console.error)
+            apiService.updateGeoObject(feature.backendId, { geometry: geoJson.geometry }).catch(console.error)
         }
     }, [updateFeature])
 
-    // ─── Handle pm:remove ────────────────────────────────────
     const handleRemove = useCallback((e: any) => {
         const layer = e.layer as L.Layer
         const fid = layerToFeatureId.current.get(layer)
         if (!fid) return
-
         const feature = useEditorStore.getState().features.find(f => f.id === fid)
         layerToFeatureId.current.delete(layer)
         featureIdToLayer.current.delete(fid)
         deleteFeature(fid)
-
-        // Delete from backend
-        if (feature?.backendId) {
-            apiService.deleteGeoObject(feature.backendId).catch(console.error)
-        }
+        if (feature?.backendId) { apiService.deleteGeoObject(feature.backendId).catch(console.error) }
     }, [deleteFeature])
 
-    // ─── Register event listeners ────────────────────────────
     useEffect(() => {
         if (!map) return
         map.on('pm:create', handleCreate)
         map.on('pm:edit', handleEdit)
         map.on('pm:remove', handleRemove)
-
         return () => {
             map.off('pm:create', handleCreate)
             map.off('pm:edit', handleEdit)
@@ -333,138 +272,86 @@ export function useGeoman() {
         }
     }, [map, handleCreate, handleEdit, handleRemove])
 
-    // ─── Load features from backend → leaflet layers ────────
+    // ─── Load features ───────────────────────────────────────
     useEffect(() => {
         if (!map) return
-
-        // Add existing features from store as leaflet layers
         features.forEach((f) => {
-            if (featureIdToLayer.current.has(f.id)) return // already on map
-
+            if (featureIdToLayer.current.has(f.id)) return 
             const geoJsonLayer = L.geoJSON(
                 { type: 'Feature', properties: {}, geometry: f.geometry } as GeoJSON.Feature,
                 {
-                    style: () => ({
-                        color: f.style.color,
-                        fillColor: f.style.fillColor,
-                        fillOpacity: f.style.fillOpacity,
-                        weight: f.style.weight,
-                    }),
-                    pointToLayer: (_, latlng) => {
+                    smoothFactor: 0,
+                    style: () => {
+                        const style = getAdvancedStyle(f.featureClass, f.metadata, f.style)
+                        const isLine = f.featureClass === 'road' || f.featureClass === 'river'
+                        return {
+                            color: style.color, fillColor: isLine ? 'transparent' : style.fillColor,
+                            fillOpacity: isLine ? 0 : style.fillOpacity,
+                            weight: style.weight, dashArray: style.dashArray, noClip: true
+                        }
+                    },
+                    pointToLayer: (_: any, latlng: any) => {
                         return L.circleMarker(latlng, {
-                            radius: 8,
-                            fillColor: f.style.fillColor,
-                            color: f.style.color,
-                            weight: f.style.weight,
-                            fillOpacity: f.style.fillOpacity,
+                            radius: 8, fillColor: f.style.fillColor, color: f.style.color,
+                            weight: f.style.weight, fillOpacity: f.style.fillOpacity,
                         })
                     },
-                }
+                } as any
             )
-
             geoJsonLayer.eachLayer((layer) => {
                 layerToFeatureId.current.set(layer, f.id)
                 featureIdToLayer.current.set(f.id, layer)
-
                 layer.on('click', () => setSelectedFeature(f.id))
-
-                // Only add visible features
-                if (f.visible) {
-                    layer.addTo(map)
-                }
+                if (f.visible) layer.addTo(map)
             })
         })
     }, [map, features, setSelectedFeature])
 
-    // ─── Sync visibility & deletion changes ──────────────────
+    // ─── Sync visibility & selection ─────────────────────────
     useEffect(() => {
-        // 1. Remove layers for features that no longer exist
         const currentFeatureIds = new Set(features.map(f => f.id))
         featureIdToLayer.current.forEach((layer, fid) => {
             if (!currentFeatureIds.has(fid)) {
                 map.removeLayer(layer)
                 featureIdToLayer.current.delete(fid)
-                // Also remove from layerToFeatureId map
-                layerToFeatureId.current.forEach((_, l) => {
-                    if (l === layer) layerToFeatureId.current.delete(l)
-                })
             }
         })
 
-        // 2. Sync visibility and styles for existing features
         features.forEach((f) => {
             const layer = featureIdToLayer.current.get(f.id)
             if (!layer) return
-            
-            if (f.visible && !map.hasLayer(layer)) {
-                layer.addTo(map)
-            } else if (!f.visible && map.hasLayer(layer)) {
-                map.removeLayer(layer)
-            }
+            if (f.visible && !map.hasLayer(layer)) layer.addTo(map)
+            else if (!f.visible && map.hasLayer(layer)) map.removeLayer(layer)
 
-            // Update style live
             if ('setStyle' in layer) {
-                (layer as L.Path).setStyle({
-                    color: f.style.color,
-                    fillColor: f.style.fillColor,
-                    fillOpacity: f.style.fillOpacity,
-                    weight: f.style.weight,
-                })
-            }
-        })
-    }, [map, features])
-
-    // ─── Highlight selected feature ──────────────────────────
-    useEffect(() => {
-        featureIdToLayer.current.forEach((layer, fid) => {
-            if ('setStyle' in layer) {
-                const feature = features.find(f => f.id === fid)
-                if (!feature) return
-                const isLine = feature.featureClass === 'road' || 
-                               feature.featureClass === 'river' ||
-                               feature.geometry.type === 'LineString' || 
-                               feature.geometry.type === 'MultiLineString'
+                const style = getAdvancedStyle(f.featureClass, f.metadata, f.style)
+                const isLine = f.featureClass === 'road' || f.featureClass === 'river'
+                const isSelected = f.id === selectedFeatureId;
                 
-                if (fid === selectedFeatureId) {
-                    (layer as L.Path).setStyle({
-                        color: '#6366f1', // Indigo outline
-                        weight: feature.style.weight + 2,
-                        dashArray: '5,5',
-                        fillOpacity: isLine ? 0 : feature.style.fillOpacity,
-                        fill: !isLine
-                    })
-                } else {
-                    (layer as L.Path).setStyle({
-                        color: feature.style.color,
-                        weight: feature.style.weight,
-                        dashArray: undefined,
-                        fillOpacity: feature.style.fillOpacity,
-                        fill: !isLine
-                    })
-                }
+                (layer as L.Path).setStyle({
+                    color: isSelected ? '#ff4500' : style.color, // Ярко-оранжевый для выделения
+                    fillColor: isLine ? 'transparent' : style.fillColor,
+                    fillOpacity: isLine ? 0 : (isSelected ? 0.8 : style.fillOpacity),
+                    weight: isSelected ? Math.max(style.weight + 3, 5) : style.weight,
+                    dashArray: undefined, // Сплошная линия для лучшей видимости
+                    fill: !isLine
+                })
+                if (isSelected) (layer as L.Path).bringToFront()
             }
         })
-    }, [selectedFeatureId, features])
+    }, [map, features, selectedFeatureId])
 
     return { layerToFeatureId, featureIdToLayer }
 }
 
-// ─── Backend persistence helper ────────────────────────────
 async function saveFeatureToBackend(feature: EditorFeature) {
     try {
         const res = await apiService.createGeoObject({
-            scope: 'private',
-            type: feature.featureClass as any,
-            name: feature.name,
-            description: feature.description,
-            metadata: { style: feature.style },
+            scope: 'private', type: feature.featureClass as any,
+            name: feature.name, description: feature.description,
+            metadata: { ...feature.style, fclass: feature.metadata?.fclass },
             geometry: feature.geometry as any,
         })
-        // Store the backend ID
-        useEditorStore.getState().updateFeature(feature.id, {
-            backendId: (res as any).id,
-        })
-    } catch (err) {
-        console.error('Failed to save feature:', err)
-    }
+        useEditorStore.getState().updateFeature(feature.id, { backendId: (res as any).id })
+    } catch (err) { console.error('Failed to save feature:', err) }
 }
