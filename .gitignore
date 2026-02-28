@@ -13,6 +13,7 @@ import*.log
 *.gpkg
 *.zip
 *.csv
+*.sql.gz*
 postgres_data/
 
 # OS files
