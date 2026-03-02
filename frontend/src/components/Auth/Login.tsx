@@ -18,7 +18,7 @@ export default function Login() {
     try {
       await login(email, password)
     } catch (err) {
-      setError('Invalid email or password')
+      setError('Неверная почта или пароль')
     } finally {
       setLoading(false)
     }
@@ -46,8 +46,8 @@ export default function Login() {
         {/* Card */}
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-            <p className="text-slate-400">Sign in to access your geo portal</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Добро пожаловать</h1>
+            <p className="text-slate-400">Войдите для доступа к порталу</p>
           </div>
           
           {error && (
@@ -59,7 +59,7 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-                Email
+                Электронная почта
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -79,7 +79,7 @@ export default function Login() {
             
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                Password
+                Пароль
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -103,10 +103,10 @@ export default function Login() {
               className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <span>Signing in...</span>
+                <span>Вход...</span>
               ) : (
                 <>
-                  <span>Sign in</span>
+                  <span>Войти</span>
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -115,9 +115,9 @@ export default function Login() {
 
           <div className="mt-6 text-center">
             <p className="text-slate-400">
-              Don't have an account?{' '}
+              Нет аккаунта?{' '}
               <Link to="/register" className="text-emerald-400 hover:text-emerald-300 font-medium">
-                Register
+                Зарегистрироваться
               </Link>
             </p>
           </div>

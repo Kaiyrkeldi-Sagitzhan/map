@@ -45,7 +45,7 @@ const GlobeScene = forwardRef<GlobeHandle, { width: number; height: number }>(
       c.addEventListener('start', () => clearTimeout(returnTimer))
       c.addEventListener('end', () => {
         returnTimer = window.setTimeout(() => {
-          g.pointOfView({ lat: 48, lng: 67, altitude: 1.8 }, 2500)
+          g.pointOfView({ lat: 48, lng: 67, altitude: 5.0 }, 2500)
         }, 3000)
       })
 

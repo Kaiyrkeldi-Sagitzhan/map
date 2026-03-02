@@ -107,7 +107,23 @@ export default function PropertiesPanel() {
     }, [feature])
 
     // No feature selected - RETURN ONLY AFTER ALL HOOKS
-    if (!feature) return null
+    if (!feature) return (
+        <div className="w-[320px] min-w-[320px] h-full bg-white/70 backdrop-blur-md border-l border-gray-200/50 flex flex-col z-[500] overflow-hidden shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Свойства</h2>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-indigo-400">
+                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+                        <path d="M13 13l6 6" />
+                    </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Объект не выбран</p>
+                <p className="text-xs text-gray-500">Нажмите на объект на карте, чтобы увидеть и отредактировать его свойства</p>
+            </div>
+        </div>
+    )
 
     // ─── Export handlers ──────────────────────────────────────
     const exportGeoJSON = () => {
@@ -174,8 +190,8 @@ export default function PropertiesPanel() {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto min-h-0">
                 {/* Name */}
-                <div className="px-4 py-3 border-b border-gray-50">
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Название</label>
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">Название</label>
                     <input
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
                         value={name}
@@ -186,8 +202,8 @@ export default function PropertiesPanel() {
                 </div>
 
                 {/* Class */}
-                <div className="px-4 py-3 border-b border-gray-50">
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Класс</label>
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">Класс</label>
                     <select
                         value={fc}
                         onChange={(e) => handleClassChange(e.target.value as FeatureClass)}
@@ -200,11 +216,11 @@ export default function PropertiesPanel() {
                 </div>
 
                 {/* Colors */}
-                <div className="px-4 py-3 border-b border-gray-50">
-                    <label className="text-xs font-medium text-gray-500 mb-2 block">Цвета</label>
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-2 block">Цвета</label>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs text-gray-400">Обводка</label>
+                            <label className="text-xs text-gray-600">Обводка</label>
                             <div className="flex items-center gap-2 mt-1">
                                 <input
                                     type="color"
@@ -212,11 +228,11 @@ export default function PropertiesPanel() {
                                     onChange={(e) => handleStyleChange('color', e.target.value)}
                                     className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200"
                                 />
-                                <span className="text-xs text-gray-500 font-mono">{style.color}</span>
+                                <span className="text-xs text-gray-700 font-mono">{style.color}</span>
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs text-gray-400">Заливка</label>
+                            <label className="text-xs text-gray-600">Заливка</label>
                             <div className="flex items-center gap-2 mt-1">
                                 <input
                                     type="color"
@@ -224,18 +240,18 @@ export default function PropertiesPanel() {
                                     onChange={(e) => handleStyleChange('fillColor', e.target.value)}
                                     className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200"
                                 />
-                                <span className="text-xs text-gray-500 font-mono">{style.fillColor}</span>
+                                <span className="text-xs text-gray-700 font-mono">{style.fillColor}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Stroke width & opacity */}
-                <div className="px-4 py-3 border-b border-gray-50">
+                <div className="px-4 py-3 border-b border-gray-200">
                     <div className="space-y-3">
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-xs text-gray-400">Толщина линии</label>
+                                <label className="text-xs text-gray-600">Толщина линии</label>
                                 <span className="text-xs text-gray-600 font-mono">{style.weight}px</span>
                             </div>
                             <input
@@ -247,7 +263,7 @@ export default function PropertiesPanel() {
                         </div>
                         <div>
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-xs text-gray-400">Прозрачность заливки</label>
+                                <label className="text-xs text-gray-600">Прозрачность заливки</label>
                                 <span className="text-xs text-gray-600 font-mono">{Math.round(style.fillOpacity * 100)}%</span>
                             </div>
                             <input
@@ -261,7 +277,7 @@ export default function PropertiesPanel() {
                 </div>
 
                 {/* Actions */}
-                <div className="px-4 py-3 border-b border-gray-50">
+                <div className="px-4 py-3 border-b border-gray-200">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleDuplicate}
@@ -285,23 +301,23 @@ export default function PropertiesPanel() {
                 </div>
 
                 {/* Geometry info */}
-                <div className="px-4 py-3 border-b border-gray-50">
-                    <label className="text-xs font-medium text-gray-500 mb-2 block">Геометрия</label>
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-2 block">Геометрия</label>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="bg-gray-50 rounded-lg p-2">
-                            <span className="text-gray-400 block">Тип</span>
+                            <span className="text-gray-600 block">Тип</span>
                             <span className="text-gray-800 font-medium">{geomInfo.type}</span>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-2">
-                            <span className="text-gray-400 block">Координат</span>
+                            <span className="text-gray-600 block">Координат</span>
                             <span className="text-gray-800 font-medium">{geomInfo.coordCount}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Description */}
-                <div className="px-4 py-3 border-b border-gray-50">
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Описание</label>
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">Описание</label>
                     <textarea
                         rows={4}
                         placeholder="Подробное описание реки, озера, рельефа..."
@@ -314,8 +330,8 @@ export default function PropertiesPanel() {
 
                 {/* Advanced Metadata */}
                 {feature.metadata && Object.keys(feature.metadata).length > 0 && (
-                    <div className="px-4 py-3 border-b border-gray-50 bg-indigo-50/20">
-                        <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 block">Доп. сведения (OSM)</label>
+                    <div className="px-4 py-3 border-b border-gray-200 bg-indigo-50/20">
+                        <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2 block">Дополнительные сведения</label>
                         <div className="space-y-1.5">
                             {Object.entries(feature.metadata).map(([key, value]) => {
                                 if (value === null || value === '' || key === 'osm_id' || key === 'code') return null
@@ -331,32 +347,34 @@ export default function PropertiesPanel() {
                 )}
 
                 {/* Export */}
-                <div className="px-4 py-3">
-                    <label className="text-xs font-medium text-gray-500 mb-2 block">Экспорт выделенного</label>
-                    <div className="grid grid-cols-3 gap-2">
+                <div className="overflow-hidden">
+                    <div className="bg-indigo-600 px-4 py-2">
+                        <label className="text-xs font-bold text-white uppercase tracking-wider">Экспорт выделенного</label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 px-4 py-3">
                         <button
                             onClick={exportGeoJSON}
-                            className="flex flex-col items-center gap-1 px-2 py-2.5 text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors border border-emerald-200"
+                            className="flex flex-col items-center gap-1.5 px-2 py-4 text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors border border-emerald-200"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
                             </svg>
                             GeoJSON
                         </button>
                         <button
                             onClick={exportSVG}
-                            className="flex flex-col items-center gap-1 px-2 py-2.5 text-xs font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200"
+                            className="flex flex-col items-center gap-1.5 px-2 py-4 text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition-colors border border-purple-200"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
                             </svg>
                             SVG
                         </button>
                         <button
                             onClick={exportPNG}
-                            className="flex flex-col items-center gap-1 px-2 py-2.5 text-xs font-medium bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg transition-colors border border-sky-200"
+                            className="flex flex-col items-center gap-1.5 px-2 py-4 text-xs font-bold bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg transition-colors border border-sky-200"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                             </svg>
                             PNG

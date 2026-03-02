@@ -84,7 +84,7 @@ export default function LayersPanel() {
             {/* Tree view */}
             <div className="flex-1 overflow-y-auto py-2 min-h-0">
                 {layers.length === 0 && (
-                    <div className="px-4 py-8 text-center text-gray-400 text-sm">
+                    <div className="px-4 py-8 text-center text-gray-600 text-sm">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-2 opacity-40">
                             <rect x="2" y="2" width="20" height="20" rx="2" />
                             <line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
@@ -130,7 +130,7 @@ export default function LayersPanel() {
                                 </span>
 
                                 {/* Count */}
-                                <span className="text-xs text-gray-400 font-mono">
+                                <span className="text-xs text-gray-500 font-mono">
                                     {layerFeatures.length}
                                 </span>
 
@@ -192,7 +192,7 @@ export default function LayersPanel() {
 
             {/* Footer stats */}
             <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/50">
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-600">
                     {features.length} объект{features.length !== 1 ? 'ов' : ''} • {layers.length} сло{layers.length !== 1 ? 'ёв' : 'й'}
                 </p>
             </div>
@@ -273,7 +273,7 @@ function FeatureItem({
             {/* Visibility */}
             <button
                 onClick={(e) => { e.stopPropagation(); onToggleVisibility() }}
-                className="p-0.5 rounded hover:bg-gray-200 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-0.5 rounded hover:bg-gray-200 transition-colors opacity-60 hover:opacity-100"
                 style={{ opacity: isSelected || !feature.visible ? 1 : undefined }}
             >
                 {feature.visible ? (

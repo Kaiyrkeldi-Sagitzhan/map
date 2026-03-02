@@ -30,7 +30,7 @@ const SearchResults: React.FC = () => {
             <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                     <Search className="w-3 h-3" />
-                    <span>Найдено ({searchResults.length})</span>
+                    <span>Найдено {searchResults.length}</span>
                 </h3>
                 <button 
                     onClick={clearSearchResults}

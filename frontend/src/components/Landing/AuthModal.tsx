@@ -27,7 +27,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
       }
       onClose()
     } catch {
-      setError(mode === 'login' ? 'Invalid email or password' : 'Registration failed')
+      setError(mode === 'login' ? 'Неверная почта или пароль' : 'Ошибка регистрации')
     } finally {
       setLoading(false)
     }
@@ -53,12 +53,12 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
         </button>
 
         <h2 className="text-2xl font-bold text-white mb-2 text-center">
-          {mode === 'login' ? 'Welcome back' : 'Create account'}
+          {mode === 'login' ? 'Добро пожаловать' : 'Создать аккаунт'}
         </h2>
         <p className="text-slate-400 text-center mb-6">
           {mode === 'login'
-            ? 'Sign in to access the map editor'
-            : 'Register to start editing maps'}
+            ? 'Войдите для доступа к редактору'
+            : 'Зарегистрируйтесь для начала работы'}
         </p>
 
         {error && (
@@ -70,7 +70,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Email
+              Электронная почта
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -89,7 +89,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Password
+              Пароль
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -113,8 +113,8 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
             className="w-full py-2.5 bg-[#FFD700] text-[#0A192F] font-semibold rounded-lg hover:bg-[#FFE44D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
-              ? (mode === 'login' ? 'Signing in...' : 'Creating account...')
-              : (mode === 'login' ? 'Sign in' : 'Create account')
+              ? (mode === 'login' ? 'Вход...' : 'Создание...')
+              : (mode === 'login' ? 'Войти' : 'Создать аккаунт')
             }
           </button>
         </form>
@@ -122,22 +122,22 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
         <div className="mt-5 text-center text-sm text-slate-400">
           {mode === 'login' ? (
             <>
-              Don&apos;t have an account?{' '}
+              Нет аккаунта?{' '}
               <button
                 onClick={() => onSwitchMode('register')}
                 className="text-[#FFD700] hover:text-[#FFE44D] font-medium"
               >
-                Register
+                Зарегистрироваться
               </button>
             </>
           ) : (
             <>
-              Already have an account?{' '}
+              Уже есть аккаунт?{' '}
               <button
                 onClick={() => onSwitchMode('login')}
                 className="text-[#FFD700] hover:text-[#FFE44D] font-medium"
               >
-                Sign in
+                Войти
               </button>
             </>
           )}

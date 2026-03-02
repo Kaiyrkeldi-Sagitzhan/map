@@ -17,7 +17,7 @@ interface ToolDef {
 const tools: ToolDef[] = [
     {
         id: 'select',
-        label: 'Select (V)',
+        label: 'Выделение',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
@@ -27,7 +27,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'drawPolygon',
-        label: 'Polygon (P)',
+        label: 'Полигон',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2l9 7-3.5 11h-11L3 9z" />
@@ -36,7 +36,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'drawRectangle',
-        label: 'Rectangle (R)',
+        label: 'Прямоугольник',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -45,7 +45,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'drawCircle',
-        label: 'Circle (O)',
+        label: 'Круг',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -54,7 +54,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'drawLine',
-        label: 'Line (L)',
+        label: 'Линия',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="5" y1="19" x2="19" y2="5" />
@@ -63,7 +63,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'freehand',
-        label: 'Freehand (F)',
+        label: 'Свободная линия',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 17c2-2 4-6 7-6s3 4 5 4 3-3 5-5" />
@@ -72,7 +72,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'marker',
-        label: 'Marker (M)',
+        label: 'Маркер',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
@@ -82,7 +82,7 @@ const tools: ToolDef[] = [
     },
     {
         id: 'searchArea',
-        label: 'Search Area (S)',
+        label: 'Область поиска',
         icon: (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
@@ -160,7 +160,7 @@ export default function Toolbar() {
 
                 <button
                     onClick={() => setShowMap(!showMap)}
-                    title={showMap ? "Hide Base Map" : "Show Base Map"}
+                    title={showMap ? "Скрыть подложку" : "Показать подложку"}
                     className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
                         showMap ? 'text-gray-600 hover:bg-gray-100' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
                     }`}
@@ -183,7 +183,7 @@ export default function Toolbar() {
                             useEditorStore.getState().clearFeatures()
                         }
                     }}
-                    title="Clear Map"
+                    title="Очистить карту"
                     className="flex items-center justify-center w-10 h-10 rounded-full text-red-500 hover:bg-red-50 transition-colors"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

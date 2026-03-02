@@ -208,7 +208,7 @@ export default function TextSearch() {
                 <div className="mt-1 bg-white rounded-xl shadow-xl border border-gray-200 max-h-[300px] overflow-y-auto">
                     <div className="px-3 py-2 border-b border-gray-100">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Результаты ({results.length})
+                            Найдено {results.length}
                         </span>
                     </div>
                     {results.map(r => (

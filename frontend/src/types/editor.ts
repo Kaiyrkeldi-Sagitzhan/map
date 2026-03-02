@@ -54,8 +54,8 @@ export const CLASS_LABELS: Record<FeatureClass, string> = {
     road: 'Дорога',
     building: 'Здание',
     city: 'Населенный пункт',
-    other: 'Точки интереса (POI)',
-    custom: 'Все объекты (Разведка)',
+    other: 'Точки интереса',
+    custom: 'Все объекты',
 }
 
 export function getSafeLabel(fc: string): string {

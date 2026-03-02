@@ -26,7 +26,7 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Nav */}
           <nav className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="flex items-center gap-2 text-slate-200">
               <User className="w-4 h-4" />
               <span className="text-sm">{user?.email}</span>
               {isAdmin && (
@@ -40,7 +40,7 @@ export default function Layout({ children }: LayoutProps) {
               className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              Logout
+              Выйти
             </button>
           </nav>
         </div>

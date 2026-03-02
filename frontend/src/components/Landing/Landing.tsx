@@ -117,20 +117,15 @@ export default function Landing() {
         },
       })
 
-      // Very deep zoom to Astana (altitude 0.05)
-      let zoomed = false
+      // Zoom to Astana on scroll down, reset on scroll back up
       ScrollTrigger.create({
         trigger: section,
         start: 'top 60%',
         onEnter: () => {
-          if (!zoomed) {
-            globeRef.current?.flyTo(51.1694, 71.4491, 0.05, 3500)
-            zoomed = true
-          }
+          globeRef.current?.flyTo(51.1694, 71.4491, 0.05, 3500)
         },
         onLeaveBack: () => {
-          globeRef.current?.flyTo(48, 67, 5.0, 2500) // Reset to far altitude
-          zoomed = false
+          globeRef.current?.flyTo(48, 67, 5.0, 2500)
         },
       })
 
@@ -215,14 +210,14 @@ export default function Landing() {
             className="px-5 py-2 border border-[#FFD700] text-white rounded-lg hover:bg-[#FFD700] hover:text-[#0A192F] transition-all duration-300 text-sm font-medium"
             {...glowHandlers()}
           >
-            Login
+            Войти
           </button>
           <button
             onClick={() => setAuthMode('register')}
             className="px-5 py-2 border border-[#FFD700] text-white rounded-lg hover:bg-[#FFD700] hover:text-[#0A192F] transition-all duration-300 text-sm font-medium"
             {...glowHandlers()}
           >
-            Register
+            Регистрация
           </button>
         </div>
       </header>
@@ -258,7 +253,7 @@ export default function Landing() {
           </h1>
           <p className="text-center text-slate-300/80 text-sm md:text-base mt-4 tracking-wide"
              style={{ fontFamily: 'Inter, sans-serif' }}>
-            Topographic map editor powered by OpenStreetMap
+            Топографический редактор карт на базе OpenStreetMap
           </p>
         </div>
       </section>
@@ -284,12 +279,12 @@ export default function Landing() {
               className="text-4xl font-bold mb-8"
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              About PacKZ
+              О проекте
             </h2>
 
             <div className="text-slate-300 leading-relaxed space-y-4 text-[15px]">
               <p>
-                PacKZ — специализированный геоинформационный инструмент для
+                PacKZ это специализированный геоинформационный инструмент для
                 актуализации и создания топографических карт территории Казахстана.
                 В основе проекта лежит интеграция данных OpenStreetMap с форматом
                 хранения GeoPackage, что обеспечивает работу с актуальными
@@ -322,8 +317,8 @@ export default function Landing() {
           <div className="flex items-start gap-3 p-5 rounded-xl bg-slate-900/40 backdrop-blur-md border border-white/10 hover:bg-white/[0.06] transition-all duration-300 shadow-xl">
             <Pencil className="w-6 h-6 text-[#FFD700] shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold mb-1">Draw Polygon</h3>
-              <p className="text-sm text-slate-400">
+              <h3 className="font-semibold mb-1 text-white">Рисование полигонов</h3>
+              <p className="text-sm text-white">
                 Точное создание контуров озёр, лесных массивов и
                 административных границ с привязкой к координатам.
               </p>
@@ -332,8 +327,8 @@ export default function Landing() {
           <div className="flex items-start gap-3 p-5 rounded-xl bg-slate-900/40 backdrop-blur-md border border-white/10 hover:bg-white/[0.06] transition-all duration-300 shadow-xl">
             <Layers className="w-6 h-6 text-[#00BFFF] shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold mb-1">Properties Panel</h3>
-              <p className="text-sm text-slate-400">
+              <h3 className="font-semibold mb-1 text-white">Панель свойств</h3>
+              <p className="text-sm text-white">
                 Редактирование цвета, толщины линий, прозрачности заливки и
                 текстовых описаний для каждого объекта на карте.
               </p>
@@ -342,9 +337,9 @@ export default function Landing() {
           <div className="flex items-start gap-3 p-5 rounded-xl bg-slate-900/40 backdrop-blur-md border border-white/10 hover:bg-white/[0.06] transition-all duration-300 shadow-xl">
             <Globe className="w-6 h-6 text-[#FFD700] shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold mb-1">Export</h3>
-              <p className="text-sm text-slate-400">
-                GeoJSON, SVG и PNG — для интеграции с QGIS, ArcGIS, для
+              <h3 className="font-semibold mb-1 text-white">Экспорт</h3>
+              <p className="text-sm text-white">
+                GeoJSON, SVG и PNG для интеграции с QGIS, ArcGIS, для
                 публикаций и печати актуализированных карт.
               </p>
             </div>
@@ -392,10 +387,10 @@ export default function Landing() {
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.05)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
         >
-          Get Started
+          Начать работу
         </button>
         <p className="text-sm text-slate-500" style={{ fontFamily: 'Inter, sans-serif' }}>
-          &copy; 2026 Anuar. All rights reserved.
+          &copy; 2026 Anuar
         </p>
       </footer>
 

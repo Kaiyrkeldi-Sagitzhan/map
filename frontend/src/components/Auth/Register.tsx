@@ -16,12 +16,12 @@ export default function Register() {
     setError('')
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError('Пароли не совпадают')
       return
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError('Пароль должен быть не менее 6 символов')
       return
     }
 
@@ -30,7 +30,7 @@ export default function Register() {
     try {
       await register(email, password)
     } catch (err) {
-      setError('Registration failed. Please try again.')
+      setError('Ошибка регистрации. Попробуйте снова')
     } finally {
       setLoading(false)
     }
@@ -58,8 +58,8 @@ export default function Register() {
         {/* Card */}
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Create Account</h1>
-            <p className="text-slate-400">Join the geo portal community</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Создать аккаунт</h1>
+            <p className="text-slate-400">Присоединяйтесь к геопорталу</p>
           </div>
           
           {error && (
@@ -71,7 +71,7 @@ export default function Register() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
-                Email
+                Электронная почта
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -91,7 +91,7 @@ export default function Register() {
             
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                Password
+                Пароль
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -112,7 +112,7 @@ export default function Register() {
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
-                Confirm Password
+                Подтвердите пароль
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -136,10 +136,10 @@ export default function Register() {
               className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <span>Creating account...</span>
+                <span>Создание...</span>
               ) : (
                 <>
-                  <span>Create Account</span>
+                  <span>Создать аккаунт</span>
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -148,9 +148,9 @@ export default function Register() {
 
           <div className="mt-6 text-center">
             <p className="text-slate-400">
-              Already have an account?{' '}
+              Уже есть аккаунт?{' '}
               <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">
-                Sign in
+                Войти
               </Link>
             </p>
           </div>
