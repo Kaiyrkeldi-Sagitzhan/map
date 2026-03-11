@@ -260,14 +260,17 @@ func (h *GeoObjectHandler) GetTile(c *gin.Context) {
 	x, _ := strconv.Atoi(c.Param("x"))
 	y, _ := strconv.Atoi(c.Param("y"))
 
+	log.Printf("[DEBUG] Tile request: z=%d, x=%d, y=%d", z, x, y)
+
 	tile, err := h.service.GetTile(c.Request.Context(), z, x, y)
 	if err != nil {
-		log.Printf("[ERROR] Failed to get tile: %v", err)
+		log.Printf("[ERROR] Failed to get tile %d/%d/%d: %v", z, x, y, err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	if tile == nil {
+		log.Printf("[DEBUG] Tile %d/%d/%d is empty", z, x, y)
 		c.Status(http.StatusNoContent)
 		return
 	}

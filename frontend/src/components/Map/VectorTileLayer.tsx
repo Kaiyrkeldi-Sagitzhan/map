@@ -4,6 +4,7 @@ import L from 'leaflet'
 import 'leaflet.vectorgrid'
 import { apiService } from '../../services/api'
 import { getAdvancedStyle } from '../../types/editor'
+import { useEditorStore } from '../../store/editorStore'
 
 export default function VectorTileLayer() {
     const map = useMap()
@@ -13,12 +14,10 @@ export default function VectorTileLayer() {
         if (!map) return
 
         const tileUrl = apiService.getTileUrl()
-        
-        // Define vector tile styling based on our advanced cartography engine
+
         const vectorTileOptions = {
             rendererFactory: (L.canvas as any).tile,
             vectorTileLayerStyles: {
-                // 'objects' is the layer name defined in our PostGIS MVT query
                 objects: (properties: any) => {
                     const style = getAdvancedStyle(properties.type, properties.metadata)
                     return {
@@ -32,16 +31,35 @@ export default function VectorTileLayer() {
                 }
             },
             interactive: true,
-            getFeatureId: (f: any) => f.properties.id
+            getFeatureId: (f: any) => f.properties?.id
         }
 
-        // @ts-ignore - Leaflet.VectorGrid is not typed in standard leaflet
+        // @ts-ignore
         const layer = L.vectorGrid.protobuf(tileUrl, vectorTileOptions)
 
         layer.on('click', (e: any) => {
-            const props = e.layer.properties
-            console.log('Clicked feature:', props)
-            // Here we can trigger selection in the future
+            const tool = useEditorStore.getState().currentTool
+            // If e.latlng is missing (common with canvas vectorgrid), calculate from original event
+            const latlng = e.latlng || map.mouseEventToLatLng(e.originalEvent)
+            
+            console.log('[VectorTileLayer] click intercepted, tool =', tool, 'latlng =', latlng)
+
+            // In edit/history mode: forward click to map so useGeoman's pickObjectAt handles it
+            if (tool === 'edit' || tool === 'history') {
+                map.fireEvent('click', {
+                    latlng,
+                    layerPoint: e.layerPoint,
+                    containerPoint: e.containerPoint,
+                    originalEvent: e.originalEvent,
+                })
+                return
+            }
+
+            // For other tools: just log
+            const props = e.layer?.properties
+            if (props) {
+                console.log('Clicked vector feature:', props.name || props.id, props)
+            }
         })
 
         layer.addTo(map)

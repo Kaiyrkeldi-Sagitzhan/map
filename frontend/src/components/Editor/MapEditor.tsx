@@ -27,12 +27,27 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 })
 
-// Component to handle initial "Fly To" animation
-const GlobeAnimator = () => {
+// Component to handle initial "Fly To" animation and register map instance
+const MapStateTracker = () => {
     const map = useMap()
     const animated = useRef(false)
 
     useEffect(() => {
+        // Register map globally for Toolbar access
+        ;(window as any).leafletMap = map
+
+        // Restore view from localStorage if exists
+        const savedView = localStorage.getItem('map-view')
+        if (savedView) {
+            try {
+                const { lat, lng, zoom } = JSON.parse(savedView)
+                map.setView([lat, lng], zoom)
+                animated.current = true // Skip initial flyTo if we have a saved view
+            } catch (e) {
+                console.error('Failed to restore map view', e)
+            }
+        }
+
         if (!animated.current) {
             // Smoothly focus on Kazakhstan
             setTimeout(() => {
@@ -45,13 +60,31 @@ const GlobeAnimator = () => {
         }
     }, [map])
 
+    // Save view to localStorage on every move/zoom
+    useEffect(() => {
+        const handleMove = () => {
+            const center = map.getCenter()
+            const zoom = map.getZoom()
+            localStorage.setItem('map-view', JSON.stringify({
+                lat: center.lat,
+                lng: center.lng,
+                zoom
+            }))
+        }
+        map.on('moveend', handleMove)
+        map.on('zoomend', handleMove)
+        return () => {
+            map.off('moveend', handleMove)
+            map.off('zoomend', handleMove)
+        }
+    }, [map])
+
     return null
 }
 
 const MapEditor = () => {
     const showMap = useEditorStore((s) => s.showMap)
     const mapOpacity = useEditorStore((s) => s.mapOpacity)
-    const isLoading = useEditorStore((s) => s.isLoading)
 
     return (
         <div className="flex h-full w-full overflow-hidden bg-gray-50 text-gray-900 font-sans">
@@ -69,7 +102,7 @@ const MapEditor = () => {
                     maxZoom={20}
                     preferCanvas={true}
                 >
-                    <GlobeAnimator />
+                    <MapStateTracker />
                     <TileLayer
                         url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -84,17 +117,6 @@ const MapEditor = () => {
                     <ScaleControl position="bottomleft" />
                     <ZoomPicker />
                 </MapContainer>
-
-                {/* Loading overlay */}
-                {isLoading && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-gray-200 flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-indigo-600" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        <span className="text-sm text-gray-700 font-medium">Загрузка объектов</span>
-                    </div>
-                )}
 
                 {/* Overlays (Zustand based) */}
                 <Toolbar />

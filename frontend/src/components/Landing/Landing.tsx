@@ -13,14 +13,7 @@ import AuthModal from './AuthModal'
 gsap.registerPlugin(ScrollTrigger)
 
 /* ── Screenshot placeholders ─────────────────────────────── */
-const SCREENSHOTS = [
-  { src: new URL('../../assets/example_images/example1.png', import.meta.url).href, caption: 'Интерфейс редактирования рек' },
-  { src: new URL('../../assets/example_images/example2.png', import.meta.url).href, caption: 'Панель свойств объекта' },
-  { src: new URL('../../assets/example_images/example3.png', import.meta.url).href, caption: 'Слои и группировка' },
-  { src: new URL('../../assets/example_images/example4.png', import.meta.url).href, caption: 'Экспорт данных в GeoJSON' },
-  { src: new URL('../../assets/example_images/example5.png', import.meta.url).href, caption: 'Поиск по координатам' },
-  { src: new URL('../../assets/example_images/example6.png', import.meta.url).href, caption: 'Рисование полигонов' },
-]
+const SCREENSHOTS: any[] = []
 
 /* ── Component ───────────────────────────────────────────── */
 export default function Landing() {

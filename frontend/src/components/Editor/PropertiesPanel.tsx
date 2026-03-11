@@ -3,7 +3,7 @@
  * 320px fixed, shown only when a feature is selected.
  * Includes name, class, colors, stroke width, opacity, description, geometry info, export.
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useEditorStore } from '../../store/editorStore'
 import { getSafeLabel, getSafeStyle } from '../../types/editor'
 import type { FeatureClass, ClassStyle } from '../../types/editor'
@@ -13,22 +13,27 @@ import { apiService } from '../../services/api'
 const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
 
 export default function PropertiesPanel() {
-    const {
-        selectedFeatureId,
-        features,
-        updateFeature,
-        deleteFeature,
-        duplicateFeature,
-        setSelectedFeature,
-    } = useEditorStore()
+    const selectedFeatureId = useEditorStore((s) => s.selectedFeatureId)
+    const features = useEditorStore((s) => s.features)
+    const updateFeature = useEditorStore((s) => s.updateFeature)
+    const addEditHistoryEntry = useEditorStore((s) => s.addEditHistoryEntry)
+    const deleteFeature = useEditorStore((s) => s.deleteFeature)
+    const duplicateFeature = useEditorStore((s) => s.duplicateFeature)
+    const setSelectedFeature = useEditorStore((s) => s.setSelectedFeature)
+    const isGeometryDirty = useEditorStore((s) => s.isGeometryDirty)
+    const setGeometryDirty = useEditorStore((s) => s.setGeometryDirty)
 
-    const feature = features.find((f) => f.id === selectedFeatureId)
+    const feature = useMemo(() => features.find((f) => f.id === selectedFeatureId), [features, selectedFeatureId])
 
     // Local editable state synced to store
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [style, setStyle] = useState<ClassStyle>({ color: '#000', fillColor: '#000', weight: 2, fillOpacity: 0.3 })
     const [fc, setFc] = useState<FeatureClass>('custom')
+    const [isDirty, setIsDirty] = useState(false)
+    const [saveFlash, setSaveFlash] = useState(false)
+    // Snapshot of feature at selection time (or after last save) — used as beforeSnapshot for edit history
+    const savedSnapshot = useRef<typeof feature | null>(null)
 
     // Sync local state when feature changes
     useEffect(() => {
@@ -37,8 +42,13 @@ export default function PropertiesPanel() {
             setDescription(feature.description)
             setStyle(feature.style)
             setFc(feature.featureClass)
+            setIsDirty(false)
+            savedSnapshot.current = JSON.parse(JSON.stringify(feature))
         }
-    }, [feature])
+    }, [feature?.id])
+
+    // Track dirty state
+    const markDirty = () => setIsDirty(true)
 
     // Persist to backend
     async function persistUpdate(patch: Record<string, any>) {
@@ -47,34 +57,79 @@ export default function PropertiesPanel() {
         }
     }
 
-    // ─── Handlers ─────────────────────────────────────────────
-    const handleNameBlur = () => {
+    // ─── Save handler (creates history entry) ─────────────────
+    const handleSave = () => {
         if (!feature) return
-        updateFeature(feature.id, { name })
-        persistUpdate({ name })
+
+        // Use the snapshot from selection time (before any geoman drags) as the true "before" state
+        const beforeSnapshot = savedSnapshot.current
+            ? JSON.parse(JSON.stringify(savedSnapshot.current))
+            : JSON.parse(JSON.stringify(feature))
+
+        const patch: Partial<typeof feature> = {
+            name, description, style, featureClass: fc,
+        }
+        updateFeature(feature.id, patch)
+
+        // Include latest geometry from store in backend update
+        persistUpdate({
+            name,
+            description,
+            type: fc as any,
+            metadata: { ...feature.metadata, style },
+            geometry: feature.geometry
+        })
+
+        // Record edit history entry
+        const changedParts: string[] = []
+        if (name !== beforeSnapshot.name) changedParts.push('название')
+        if (description !== beforeSnapshot.description) changedParts.push('описание')
+        if (fc !== beforeSnapshot.featureClass) changedParts.push('класс')
+        if (JSON.stringify(style) !== JSON.stringify(beforeSnapshot.style)) changedParts.push('стиль')
+        if (isGeometryDirty) changedParts.push('геометрия')
+
+        const desc = changedParts.length > 0
+            ? `Изменено: ${changedParts.join(', ')}`
+            : 'Сохранено без изменений'
+
+        const afterFeature = useEditorStore.getState().features.find(f => f.id === feature.id)
+        addEditHistoryEntry({
+            id: crypto.randomUUID(),
+            featureId: feature.id,
+            featureName: name,
+            action: 'update',
+            timestamp: Date.now(),
+            formattedDate: new Date().toLocaleString('ru-RU'),
+            user: 'user',
+            description: desc,
+            beforeSnapshot,
+            afterSnapshot: afterFeature ? { ...afterFeature } : { ...feature, ...patch },
+        })
+
+        // Update snapshot to post-save state for next edit cycle
+        const freshFeature = useEditorStore.getState().features.find(f => f.id === feature.id)
+        if (freshFeature) savedSnapshot.current = JSON.parse(JSON.stringify(freshFeature))
+
+        setIsDirty(false)
+        setGeometryDirty(false)
+        setSaveFlash(true)
+        setTimeout(() => {
+            setSaveFlash(false)
+            setSelectedFeature(null)
+        }, 1500)
     }
 
-    const handleDescBlur = () => {
-        if (!feature) return
-        updateFeature(feature.id, { description })
-        persistUpdate({ description })
-    }
-
+    // ─── Handlers (local only, no store update) ───────────────
     const handleClassChange = (newFc: FeatureClass) => {
-        if (!feature) return
         const newStyle = { ...getSafeStyle(newFc) }
         setFc(newFc)
         setStyle(newStyle)
-        updateFeature(feature.id, { featureClass: newFc, style: newStyle })
-        persistUpdate({ type: newFc as any, metadata: { style: newStyle } })
+        markDirty()
     }
 
     const handleStyleChange = (key: keyof ClassStyle, value: string | number) => {
-        if (!feature) return
-        const newStyle = { ...style, [key]: value }
-        setStyle(newStyle)
-        updateFeature(feature.id, { style: newStyle })
-        persistUpdate({ metadata: { style: newStyle } })
+        setStyle(prev => ({ ...prev, [key]: value }))
+        markDirty()
     }
 
     const handleDelete = () => {
@@ -195,9 +250,8 @@ export default function PropertiesPanel() {
                     <input
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onBlur={handleNameBlur}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleNameBlur() }}
+                        onChange={(e) => { setName(e.target.value); markDirty() }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
                     />
                 </div>
 
@@ -276,6 +330,33 @@ export default function PropertiesPanel() {
                     </div>
                 </div>
 
+                {/* Save button */}
+                <div className="px-4 py-3 border-b border-gray-200">
+                    <button
+                        onClick={handleSave}
+                        disabled={!isDirty && !isGeometryDirty}
+                        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all duration-200
+                            ${saveFlash
+                                ? 'bg-green-500 text-white'
+                                : (isDirty || isGeometryDirty)
+                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                    >
+                        {saveFlash ? (
+                            <>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                                Сохранено
+                            </>
+                        ) : (
+                            <>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
+                                Сохранить
+                            </>
+                        )}
+                    </button>
+                </div>
+
                 {/* Actions */}
                 <div className="px-4 py-3 border-b border-gray-200">
                     <div className="flex items-center gap-2">
@@ -323,8 +404,7 @@ export default function PropertiesPanel() {
                         placeholder="Подробное описание реки, озера, рельефа..."
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 resize-none transition-colors"
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        onBlur={handleDescBlur}
+                        onChange={(e) => { setDescription(e.target.value); markDirty() }}
                     />
                 </div>
 

@@ -412,7 +412,12 @@ func (r *GeoObjectRepository) Update(ctx context.Context, obj *model.GeoObject) 
 		WHERE id = $1
 	`
 
-	geometryJSON, err := json.Marshal(obj.Geometry)
+	geometryBytes, err := json.Marshal(obj.Geometry)
+	if err != nil {
+		return err
+	}
+
+	geometryJSON, err := extractGeometryJSON(geometryBytes)
 	if err != nil {
 		return err
 	}

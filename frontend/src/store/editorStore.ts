@@ -3,12 +3,14 @@
  * Manages tools, features, layers, undo/redo history, and mouse coords.
  */
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type {
     DrawTool,
     FeatureClass,
     EditorFeature,
     LayerNode,
     HistoryEntry,
+    EditHistoryEntry,
     MouseCoords,
     ClassStyle,
 } from '../types/editor'
@@ -41,9 +43,8 @@ interface EditorState {
     showMap: boolean
     mapOpacity: number
     isLoading: boolean
-
-    // Map action registered by useGeoman (inside MapContainer context)
-    // Removed loadVisibleObjects to prevent freezing
+    editHistory: EditHistoryEntry[]
+    isGeometryDirty: boolean
 
     // ─── Actions ─────────────────────────────────────────────
     setTool: (tool: DrawTool) => void
@@ -53,10 +54,17 @@ interface EditorState {
     setShowMap: (show: boolean) => void
     setMapOpacity: (opacity: number) => void
     setLoading: (loading: boolean) => void
+    setGeometryDirty: (dirty: boolean) => void
+    addEditHistoryEntry: (entry: EditHistoryEntry) => void
+    deleteEditHistoryEntry: (id: string) => void
+    getFeatureHistory: (featureId: string) => EditHistoryEntry[]
+    clearEditHistory: () => void
 
     // Feature CRUD
     addFeature: (feature: EditorFeature) => void
     updateFeature: (id: string, patch: Partial<EditorFeature>) => void
+    /** Update feature without recording edit history (for preview/rollback) */
+    silentUpdateFeature: (id: string, patch: Partial<EditorFeature>) => void
     deleteFeature: (id: string) => void
     duplicateFeature: (id: string) => EditorFeature | null
     setFeatures: (features: EditorFeature[]) => void
@@ -91,245 +99,306 @@ function layerId(fc: FeatureClass): string {
 }
 
 // ─── Store ─────────────────────────────────────────────────
-export const useEditorStore = create<EditorState>((set, get) => ({
-    currentTool: 'select',
-    featureClass: 'lake',
+export const useEditorStore = create<EditorState>()(
+    persist(
+        (set, get) => ({
+            currentTool: 'select',
+            featureClass: 'lake',
 
-    features: [],
-    selectedFeatureId: null,
-    searchResults: [],
+            features: [],
+            selectedFeatureId: null,
+            searchResults: [],
 
-    layers: [],
+            layers: [],
 
-    history: [],
-    historyIndex: -1,
+            history: [],
+            historyIndex: -1,
 
-    mouseCoords: null,
-    showMap: true,
-    mapOpacity: 1.0,
-    isLoading: false,
+            mouseCoords: null,
+            showMap: true,
+            mapOpacity: 1.0,
+            isLoading: false,
+            editHistory: [],
+            isGeometryDirty: false,
+            // ─── Tool / Class ────────────────────────────────────────
+            setTool: (tool) => set({ currentTool: tool }),
+            setFeatureClass: (fc) => set({ featureClass: fc }),
+            setSelectedFeature: (id) => set({ selectedFeatureId: id, isGeometryDirty: false }),
+            setMouseCoords: (coords) => set({ mouseCoords: coords }),
+            setShowMap: (show) => set({ showMap: show }),
+            setMapOpacity: (opacity) => set({ mapOpacity: opacity }),
+            setLoading: (loading) => set({ isLoading: loading }),
+            setGeometryDirty: (dirty) => set({ isGeometryDirty: dirty }),
+            addEditHistoryEntry: (entry) => set((s) => ({
 
-    // ─── Tool / Class ────────────────────────────────────────
-    setTool: (tool) => set({ currentTool: tool }),
-    setFeatureClass: (fc) => set({ featureClass: fc }),
-    setSelectedFeature: (id) => set({ selectedFeatureId: id }),
-    setMouseCoords: (coords) => set({ mouseCoords: coords }),
-    setShowMap: (show) => set({ showMap: show }),
-    setMapOpacity: (opacity) => set({ mapOpacity: opacity }),
-    setLoading: (loading) => set({ isLoading: loading }),
+                editHistory: [...s.editHistory, entry].slice(-100),
+            })),
+            deleteEditHistoryEntry: (id) => set((s) => ({
+                editHistory: s.editHistory.filter((e) => e.id !== id),
+            })),
+            getFeatureHistory: (featureId) => {
+                return get().editHistory.filter((e) => e.featureId === featureId)
+            },
+            clearEditHistory: () => set({ editHistory: [] }),
 
-    // ─── Feature CRUD ────────────────────────────────────────
-    addFeature: (feature) => {
-        set((s) => ({ features: [...s.features, feature] }))
-        get().pushHistory({ type: 'add', featureId: feature.id, before: null, after: feature })
-        get().rebuildLayers()
-    },
+            // ─── Feature CRUD ────────────────────────────────────────
+            addFeature: (feature) => {
+                set((s) => ({ features: [...s.features, feature] }))
+                get().pushHistory({ type: 'add', featureId: feature.id, before: null, after: feature })
+                get().addEditHistoryEntry({
+                    id: crypto.randomUUID(),
+                    featureId: feature.id,
+                    featureName: feature.name,
+                    action: 'create',
+                    timestamp: Date.now(),
+                    formattedDate: new Date().toLocaleString('ru-RU'),
+                    user: 'user',
+                    description: `Создан объект "${feature.name}"`,
+                    beforeSnapshot: null,
+                    afterSnapshot: { ...feature },
+                })
+                get().rebuildLayers()
+            },
 
-    updateFeature: (id, patch) => {
-        const before = get().features.find((f) => f.id === id)
-        set((s) => ({
-            features: s.features.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-        }))
-        const after = get().features.find((f) => f.id === id)
-        if (before && after) {
-            get().pushHistory({ type: 'update', featureId: id, before, after })
-        }
-        get().rebuildLayers()
-    },
-
-    deleteFeature: (id) => {
-        const before = get().features.find((f) => f.id === id)
-        set((s) => ({
-            features: s.features.filter((f) => f.id !== id),
-            selectedFeatureId: s.selectedFeatureId === id ? null : s.selectedFeatureId,
-        }))
-        if (before) {
-            get().pushHistory({ type: 'delete', featureId: id, before, after: null })
-        }
-        get().rebuildLayers()
-    },
-
-    duplicateFeature: (id) => {
-        const original = get().features.find((f) => f.id === id)
-        if (!original) return null
-        const newFeature: EditorFeature = {
-            ...original,
-            id: crypto.randomUUID(),
-            name: `${original.name} (copy)`,
-            backendId: undefined,
-        }
-        get().addFeature(newFeature)
-        return newFeature
-    },
-
-    setFeatures: (features) => {
-        set({ features })
-        get().rebuildLayers()
-    },
-    clearFeatures: () => {
-        set({ features: [], selectedFeatureId: null })
-        get().rebuildLayers()
-    },
-    
-    setSearchResults: (results) => set({ searchResults: results }),
-    clearSearchResults: () => set({ searchResults: [] }),
-
-    // ─── Layer management ────────────────────────────────────
-    toggleLayerVisibility: (lid) => {
-        set((s) => {
-            const layers = s.layers.map((l) =>
-                l.id === lid ? { ...l, visible: !l.visible } : l
-            )
-            const layer = layers.find((l) => l.id === lid)
-            if (!layer) return { layers }
-            // Sync features visibility
-            const features = s.features.map((f) =>
-                layer.featureIds.includes(f.id)
-                    ? { ...f, visible: layer.visible }
-                    : f
-            )
-            return { layers, features }
-        })
-    },
-
-    toggleLayerLock: (lid) => {
-        set((s) => {
-            const layers = s.layers.map((l) =>
-                l.id === lid ? { ...l, locked: !l.locked } : l
-            )
-            const layer = layers.find((l) => l.id === lid)
-            if (!layer) return { layers }
-            const features = s.features.map((f) =>
-                layer.featureIds.includes(f.id)
-                    ? { ...f, locked: layer.locked }
-                    : f
-            )
-            return { layers, features }
-        })
-    },
-
-    toggleLayerExpand: (lid) => {
-        set((s) => ({
-            layers: s.layers.map((l) =>
-                l.id === lid ? { ...l, expanded: !l.expanded } : l
-            ),
-        }))
-    },
-
-    rebuildLayers: () => {
-        const features = get().features
-        const classMap = new Map<FeatureClass, string[]>()
-        features.forEach((f) => {
-            const ids = classMap.get(f.featureClass) || []
-            ids.push(f.id)
-            classMap.set(f.featureClass, ids)
-        })
-
-        const existingLayers = get().layers
-        const newLayers: LayerNode[] = []
-        classMap.forEach((ids, fc) => {
-            const existing = existingLayers.find((l) => l.id === layerId(fc))
-            newLayers.push({
-                id: layerId(fc),
-                name: fc.charAt(0).toUpperCase() + fc.slice(1),
-                featureClass: fc,
-                visible: existing?.visible ?? true,
-                locked: existing?.locked ?? false,
-                expanded: existing?.expanded ?? true,
-                featureIds: ids,
-            })
-        })
-        set({ layers: newLayers })
-    },
-
-    // ─── Feature toggles ────────────────────────────────────
-    toggleFeatureVisibility: (id) => {
-        set((s) => ({
-            features: s.features.map((f) =>
-                f.id === id ? { ...f, visible: !f.visible } : f
-            ),
-        }))
-    },
-
-    toggleFeatureLock: (id) => {
-        set((s) => ({
-            features: s.features.map((f) =>
-                f.id === id ? { ...f, locked: !f.locked } : f
-            ),
-        }))
-    },
-
-    // ─── Undo / Redo ────────────────────────────────────────
-    pushHistory: (entry) => {
-        set((s) => {
-            // Truncate any future entries after current index
-            const history = s.history.slice(0, s.historyIndex + 1)
-            history.push(entry)
-            // Keep max 50 entries
-            if (history.length > 50) history.shift()
-            return { history, historyIndex: history.length - 1 }
-        })
-    },
-
-    undo: () => {
-        const { history, historyIndex, features } = get()
-        if (historyIndex < 0) return
-        const entry = history[historyIndex]
-
-        let newFeatures = [...features]
-        switch (entry.type) {
-            case 'add':
-                newFeatures = newFeatures.filter((f) => f.id !== entry.featureId)
-                break
-            case 'delete':
-                if (entry.before) newFeatures.push(entry.before)
-                break
-            case 'update':
-                if (entry.before) {
-                    newFeatures = newFeatures.map((f) =>
-                        f.id === entry.featureId ? entry.before! : f
-                    )
+            updateFeature: (id, patch) => {
+                const before = get().features.find((f) => f.id === id)
+                set((s) => ({
+                    features: s.features.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+                    isGeometryDirty: patch.geometry ? true : s.isGeometryDirty,
+                }))
+                const after = get().features.find((f) => f.id === id)
+                if (before && after) {
+                    get().pushHistory({ type: 'update', featureId: id, before, after })
                 }
-                break
-        }
+                get().rebuildLayers()
+            },
 
-        set({ features: newFeatures, historyIndex: historyIndex - 1 })
-        get().rebuildLayers()
-    },
+            silentUpdateFeature: (id, patch) => {
+                set((s) => ({
+                    features: s.features.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+                }))
+                get().rebuildLayers()
+            },
 
-    redo: () => {
-        const { history, historyIndex, features } = get()
-        if (historyIndex >= history.length - 1) return
-        const entry = history[historyIndex + 1]
-
-        let newFeatures = [...features]
-        switch (entry.type) {
-            case 'add':
-                if (entry.after) newFeatures.push(entry.after)
-                break
-            case 'delete':
-                newFeatures = newFeatures.filter((f) => f.id !== entry.featureId)
-                break
-            case 'update':
-                if (entry.after) {
-                    newFeatures = newFeatures.map((f) =>
-                        f.id === entry.featureId ? entry.after! : f
-                    )
+            deleteFeature: (id) => {
+                const before = get().features.find((f) => f.id === id)
+                set((s) => ({
+                    features: s.features.filter((f) => f.id !== id),
+                    selectedFeatureId: s.selectedFeatureId === id ? null : s.selectedFeatureId,
+                }))
+                if (before) {
+                    get().pushHistory({ type: 'delete', featureId: id, before, after: null })
+                    get().addEditHistoryEntry({
+                        id: crypto.randomUUID(),
+                        featureId: id,
+                        featureName: before.name,
+                        action: 'delete',
+                        timestamp: Date.now(),
+                        formattedDate: new Date().toLocaleString('ru-RU'),
+                        user: 'user',
+                        description: `Удалён объект "${before.name}"`,
+                        beforeSnapshot: { ...before },
+                        afterSnapshot: null,
+                    })
                 }
-                break
+                get().rebuildLayers()
+            },
+
+            duplicateFeature: (id) => {
+                const original = get().features.find((f) => f.id === id)
+                if (!original) return null
+                const newFeature: EditorFeature = {
+                    ...original,
+                    id: crypto.randomUUID(),
+                    name: `${original.name} (copy)`,
+                    backendId: undefined,
+                }
+                get().addFeature(newFeature)
+                return newFeature
+            },
+
+            setFeatures: (features) => {
+                set({ features })
+                get().rebuildLayers()
+            },
+            clearFeatures: () => {
+                set({ features: [], selectedFeatureId: null })
+                get().rebuildLayers()
+            },
+            
+            setSearchResults: (results) => set({ searchResults: results }),
+            clearSearchResults: () => set({ searchResults: [] }),
+
+            // ─── Layer management ────────────────────────────────────
+            toggleLayerVisibility: (lid) => {
+                set((s) => {
+                    const layers = s.layers.map((l) =>
+                        l.id === lid ? { ...l, visible: !l.visible } : l
+                    )
+                    const layer = layers.find((l) => l.id === lid)
+                    if (!layer) return { layers }
+                    // Sync features visibility
+                    const features = s.features.map((f) =>
+                        layer.featureIds.includes(f.id)
+                            ? { ...f, visible: layer.visible }
+                            : f
+                    )
+                    return { layers, features }
+                })
+            },
+
+            toggleLayerLock: (lid) => {
+                set((s) => {
+                    const layers = s.layers.map((l) =>
+                        l.id === lid ? { ...l, locked: !l.locked } : l
+                    )
+                    const layer = layers.find((l) => l.id === lid)
+                    if (!layer) return { layers }
+                    const features = s.features.map((f) =>
+                        layer.featureIds.includes(f.id)
+                            ? { ...f, locked: layer.locked }
+                            : f
+                    )
+                    return { layers, features }
+                })
+            },
+
+            toggleLayerExpand: (lid) => {
+                set((s) => ({
+                    layers: s.layers.map((l) =>
+                        l.id === lid ? { ...l, expanded: !l.expanded } : l
+                    ),
+                }))
+            },
+
+            rebuildLayers: () => {
+                const features = get().features
+                const classMap = new Map<FeatureClass, string[]>()
+                features.forEach((f) => {
+                    const ids = classMap.get(f.featureClass) || []
+                    ids.push(f.id)
+                    classMap.set(f.featureClass, ids)
+                })
+
+                const existingLayers = get().layers
+                const newLayers: LayerNode[] = []
+                classMap.forEach((ids, fc) => {
+                    const existing = existingLayers.find((l) => l.id === layerId(fc))
+                    newLayers.push({
+                        id: layerId(fc),
+                        name: fc.charAt(0).toUpperCase() + fc.slice(1),
+                        featureClass: fc,
+                        visible: existing?.visible ?? true,
+                        locked: existing?.locked ?? false,
+                        expanded: existing?.expanded ?? true,
+                        featureIds: ids,
+                    })
+                })
+                set({ layers: newLayers })
+            },
+
+            // ─── Feature toggles ────────────────────────────────────
+            toggleFeatureVisibility: (id) => {
+                set((s) => ({
+                    features: s.features.map((f) =>
+                        f.id === id ? { ...f, visible: !f.visible } : f
+                    ),
+                }))
+            },
+
+            toggleFeatureLock: (id) => {
+                set((s) => ({
+                    features: s.features.map((f) =>
+                        f.id === id ? { ...f, locked: !f.locked } : f
+                    ),
+                }))
+            },
+
+            // ─── Undo / Redo ────────────────────────────────────────
+            pushHistory: (entry) => {
+                set((s) => {
+                    // Truncate any future entries after current index
+                    const history = s.history.slice(0, s.historyIndex + 1)
+                    history.push(entry)
+                    // Keep max 50 entries
+                    if (history.length > 50) history.shift()
+                    return { history, historyIndex: history.length - 1 }
+                })
+            },
+
+            undo: () => {
+                const { history, historyIndex, features } = get()
+                if (historyIndex < 0) return
+                const entry = history[historyIndex]
+
+                let newFeatures = [...features]
+                switch (entry.type) {
+                    case 'add':
+                        newFeatures = newFeatures.filter((f) => f.id !== entry.featureId)
+                        break
+                    case 'delete':
+                        if (entry.before) newFeatures.push(entry.before)
+                        break
+                    case 'update':
+                        if (entry.before) {
+                            newFeatures = newFeatures.map((f) =>
+                                f.id === entry.featureId ? entry.before! : f
+                            )
+                        }
+                        break
+                }
+
+                set({ features: newFeatures, historyIndex: historyIndex - 1 })
+                get().rebuildLayers()
+            },
+
+            redo: () => {
+                const { history, historyIndex, features } = get()
+                if (historyIndex >= history.length - 1) return
+                const entry = history[historyIndex + 1]
+
+                let newFeatures = [...features]
+                switch (entry.type) {
+                    case 'add':
+                        if (entry.after) newFeatures.push(entry.after)
+                        break
+                    case 'delete':
+                        newFeatures = newFeatures.filter((f) => f.id !== entry.featureId)
+                        break
+                    case 'update':
+                        if (entry.after) {
+                            newFeatures = newFeatures.map((f) =>
+                                f.id === entry.featureId ? entry.after! : f
+                            )
+                        }
+                        break
+                }
+
+                set({ features: newFeatures, historyIndex: historyIndex + 1 })
+                get().rebuildLayers()
+            },
+
+            // ─── Computed ────────────────────────────────────────────
+            getSelectedFeature: () => {
+                const { features, selectedFeatureId } = get()
+                return features.find((f) => f.id === selectedFeatureId)
+            },
+
+            getClassStyle: () => {
+                return CLASS_STYLES[get().featureClass]
+            },
+        }),
+        {
+            name: 'kzmap-editor-storage',
+            partialize: (state) => ({
+                currentTool: state.currentTool,
+                featureClass: state.featureClass,
+                selectedFeatureId: state.selectedFeatureId,
+                showMap: state.showMap,
+                mapOpacity: state.mapOpacity,
+                features: state.features,
+                editHistory: state.editHistory,
+            }),
         }
-
-        set({ features: newFeatures, historyIndex: historyIndex + 1 })
-        get().rebuildLayers()
-    },
-
-    // ─── Computed ────────────────────────────────────────────
-    getSelectedFeature: () => {
-        const { features, selectedFeatureId } = get()
-        return features.find((f) => f.id === selectedFeatureId)
-    },
-
-    getClassStyle: () => {
-        return CLASS_STYLES[get().featureClass]
-    },
-}))
+    )
+)

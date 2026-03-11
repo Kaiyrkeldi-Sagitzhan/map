@@ -206,3 +206,4 @@ input[type="color"]::-webkit-color-swatch {
   50% { box-shadow: 0 0 16px 4px rgba(255, 215, 0, 0.15); }
 }
 
+.cursor-pencil { cursor: crosshair !important; }
