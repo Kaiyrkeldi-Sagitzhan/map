@@ -173,10 +173,10 @@ export default function Landing() {
           </span>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           <button
             onClick={() => setAuthMode('login')}
-            className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#10B981] hover:text-white transition-all"
+            className="px-6 py-2 border border-[#10B981] text-[#10B981] text-[10px] font-bold hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-500 rounded-full tracking-[0.2em] uppercase"
           >
             ACCESS MAP
           </button>

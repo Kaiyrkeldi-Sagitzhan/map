@@ -59,7 +59,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
 
         <h2 className="text-3xl font-normal text-[#10B981] mb-2 text-center"
             style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
-          {mode === 'login' ? 'freshmap access' : 'create account'}
+          {mode === 'login' ? 'Авторизация' : 'Создать аккаунт'}
         </h2>
         <p className="text-slate-400 text-center mb-8 text-sm uppercase tracking-[0.2em]">
           {mode === 'login'
@@ -68,18 +68,18 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
         </p>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-sm text-red-400 text-xs tracking-wide text-center">
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-xs tracking-wide text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em]">
-              Email Address
+            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
+              Электронная почта
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Mail className="w-4 h-4 text-slate-600" />
               </div>
               <input
@@ -88,17 +88,17 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="identity@freshmap.team"
-                className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/5 rounded-sm text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
+                className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em]">
-              Security Key
+            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
+              Пароль
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Lock className="w-4 h-4 text-slate-600" />
               </div>
               <input
@@ -108,7 +108,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                 required
                 placeholder="••••••••"
                 minLength={6}
-                className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/5 rounded-sm text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
+                className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
               />
             </div>
           </div>
@@ -116,11 +116,11 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-transparent border border-[#10B981] text-[#10B981] font-medium rounded-sm hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest text-sm"
+            className="w-full py-4 bg-transparent border border-[#10B981] text-[#10B981] font-bold rounded-full hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest text-sm"
           >
             {loading
-              ? (mode === 'login' ? 'Verifying...' : 'Processing...')
-              : (mode === 'login' ? 'Authorize' : 'Register')
+              ? (mode === 'login' ? 'Проверка...' : 'Создание...')
+              : (mode === 'login' ? 'Войти' : 'Регистрация')
             }
           </button>
         </form>
@@ -128,22 +128,22 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
         <div className="mt-8 text-center text-[11px] text-slate-500 uppercase tracking-widest">
           {mode === 'login' ? (
             <>
-              No credentials?{' '}
+              Нет аккаунта?{' '}
               <button
                 onClick={() => onSwitchMode('register')}
-                className="text-[#10B981] hover:underline"
+                className="text-[#10B981] hover:underline font-bold"
               >
-                Create Account
+                Регистрация
               </button>
             </>
           ) : (
             <>
-              Already recognized?{' '}
+              Уже есть аккаунт?{' '}
               <button
                 onClick={() => onSwitchMode('login')}
-                className="text-[#10B981] hover:underline"
+                className="text-[#10B981] hover:underline font-bold"
               >
-                Sign In
+                Войти
               </button>
             </>
           )}
