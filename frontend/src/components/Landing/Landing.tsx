@@ -54,7 +54,7 @@ export default function Landing() {
       const rx = (e.clientY / window.innerHeight - 0.5) * -8
       const ry = (e.clientX / window.innerWidth - 0.5) * 12
       card.style.transform =
-        `perspective(800px) rotateX(${4 + rx}deg) rotateY(${ry}deg)`
+        `perspective(1000px) rotateX(${4 + rx}deg) rotateY(${ry}deg)`
     }
     window.addEventListener('mousemove', onMove)
     return () => window.removeEventListener('mousemove', onMove)
@@ -85,7 +85,6 @@ export default function Landing() {
     if (globeEl) {
       gsap.set(globeEl, { xPercent: -50, yPercent: -50 })
 
-      // Move globe UP and RIGHT (to show the map while text is on the left)
       gsap.to(globeEl, {
         top: '50%',
         left: '72%',
@@ -98,7 +97,6 @@ export default function Landing() {
         },
       })
 
-      // Zoom to Astana on scroll down, reset on scroll back up
       ScrollTrigger.create({
         trigger: section,
         start: 'top 60%',
@@ -110,7 +108,6 @@ export default function Landing() {
         },
       })
 
-      // Fade out near footer
       gsap.to(globeEl, {
         opacity: 0,
         ease: 'none',
@@ -156,33 +153,32 @@ export default function Landing() {
 
       {/* ─── HEADER ────────────────────────────────────────── */}
       <header
-        className="fixed top-6 left-1/2 -translate-x-1/2 h-[70px] flex items-center justify-between px-10 w-[92%] max-w-7xl"
+        className="fixed top-8 left-1/2 -translate-x-1/2 h-[80px] flex items-center justify-between px-12 w-[95%] max-w-[1600px]"
         style={{
           background: 'rgba(2, 12, 27, 0.5)',
-          backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(35px)',
+          WebkitBackdropFilter: 'blur(35px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '100px',
           zIndex: 100,
-          boxShadow: '0 15px 35px rgba(0,0,0,0.3)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
         }}
       >
-        {/* Logo: freshmap */}
         <div className="flex items-center select-none">
           <span
-            className="text-[32px] font-normal tracking-wide text-[#10B981]"
+            className="text-[36px] font-normal tracking-wide text-[#10B981]"
             style={{ fontFamily: "'IM Fell Great Primer', serif" }}
           >
             freshmap
           </span>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           <button
             onClick={() => setAuthMode('login')}
-            className="text-xs font-bold uppercase tracking-[0.2em] text-[#10B981] hover:text-white transition-colors"
+            className="text-sm font-bold uppercase tracking-[0.3em] text-[#10B981] hover:text-white transition-all"
           >
-            Access Terminal
+            ACCESS MAP
           </button>
         </div>
       </header>
@@ -191,16 +187,16 @@ export default function Landing() {
       <section className="h-screen flex flex-col items-center justify-center relative px-4 lg:px-8">
         <div
           ref={titleCardRef}
-          className="relative px-16 py-12 md:px-24 md:py-20 border border-white/5"
+          className="relative px-20 py-16 md:px-32 md:py-24 border border-white/5 w-[90%] max-w-[1400px]"
           style={{
             zIndex: 5,
-            transform: 'perspective(800px) rotateX(4deg)',
+            transform: 'perspective(1000px) rotateX(4deg)',
             transition: 'transform 0.15s ease-out',
             background: 'rgba(2, 12, 27, 0.5)',
-            backdropFilter: 'blur(40px)',
-            WebkitBackdropFilter: 'blur(40px)',
-            borderRadius: '120px 20px 120px 20px',
-            boxShadow: '0 30px 70px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(45px)',
+            WebkitBackdropFilter: 'blur(45px)',
+            borderRadius: '160px 40px 160px 40px',
+            boxShadow: '0 40px 100px rgba(0,0,0,0.6)',
           }}
         >
           <h1
@@ -208,16 +204,16 @@ export default function Landing() {
             className="text-center select-none text-white"
             style={{
               fontFamily: "'IM Fell Great Primer', serif",
-              fontSize: 'clamp(3.5rem, 12vw, 10rem)',
+              fontSize: 'clamp(4rem, 15vw, 12rem)',
               fontWeight: 400,
-              lineHeight: 0.85,
-              letterSpacing: '-0.03em',
+              lineHeight: 0.8,
+              letterSpacing: '-0.04em',
               opacity: 0,
             }}
           >
             Kazakhstan
           </h1>
-          <p className="text-center text-[#10B981] text-[10px] md:text-sm mt-10 tracking-[0.5em] uppercase font-black"
+          <p className="text-center text-[#10B981] text-xs md:text-lg mt-12 tracking-[0.6em] uppercase font-black opacity-90"
              style={{ fontFamily: 'Inter, sans-serif' }}>
             Topographic Mapping System
           </p>
@@ -227,29 +223,29 @@ export default function Landing() {
       {/* ─── ABOUT ─────────────────────────────────────────── */}
       <section
         ref={aboutRef}
-        className="min-h-[80vh] px-6 lg:px-20 py-40 relative flex flex-col items-center"
+        className="min-h-[100vh] px-6 lg:px-20 py-48 relative flex flex-col items-center"
         style={{ zIndex: 2 }}
       >
-        <div className="w-full max-w-7xl lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-24 mb-32">
+        <div className="w-full max-w-[1600px] lg:grid lg:grid-cols-[1.3fr_0.7fr] lg:gap-32 mb-40">
           <div
-            className="scroll-reveal p-12 md:p-20 border border-white/5"
+            className="scroll-reveal p-16 md:p-24 border border-white/5"
             style={{
-              background: 'rgba(2, 12, 27, 0.7)',
-              backdropFilter: 'blur(45px)',
-              WebkitBackdropFilter: 'blur(45px)',
-              borderRadius: '60px',
-              boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
+              background: 'rgba(2, 12, 27, 0.75)',
+              backdropFilter: 'blur(50px)',
+              WebkitBackdropFilter: 'blur(50px)',
+              borderRadius: '80px',
+              boxShadow: '0 50px 100px rgba(0,0,0,0.5)',
             }}
           >
             <h2
-              className="text-6xl font-normal mb-14 text-[#10B981]"
+              className="text-7xl font-normal mb-16 text-[#10B981]"
               style={{ fontFamily: "'IM Fell Great Primer', serif" }}
             >
               О проекте
             </h2>
 
-            <div className="text-slate-200 leading-[1.9] space-y-10 text-xl font-light">
-              <p className="first-letter:text-6xl first-letter:font-serif first-letter:mr-3 first-letter:float-left first-letter:text-[#10B981] first-letter:leading-[1]">
+            <div className="text-slate-200 leading-[2] space-y-12 text-2xl font-light">
+              <p className="first-letter:text-7xl first-letter:font-serif first-letter:mr-4 first-letter:float-left first-letter:text-[#10B981] first-letter:leading-[1]">
                 Проект <span className="text-[#10B981] font-semibold">freshmap</span> представляет собой 
                 специализированную геоинформационную платформу, созданную для высокоточного картографирования 
                 территории Казахстана. Мы объединили открытые данные OpenStreetMap с современными форматами 
@@ -270,26 +266,52 @@ export default function Landing() {
           <div className="hidden lg:block" />
         </div>
 
-        {/* Tools */}
-        <div className="scroll-reveal grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-7xl">
-          <div className="group p-12 bg-white/[0.03] border border-white/5 hover:border-[#10B981] transition-all duration-700 backdrop-blur-xl rounded-[40px]">
-            <Pencil className="w-12 h-12 text-[#10B981] mb-10 transition-transform group-hover:scale-110" />
-            <h3 className="text-2xl font-medium mb-5 text-white">Геометрия</h3>
-            <p className="text-slate-400 leading-relaxed text-lg">
+        <div className="scroll-reveal grid grid-cols-1 md:grid-cols-3 gap-12 w-full max-w-[1600px]">
+          <div 
+            className="group p-16 border border-white/5 hover:border-[#10B981] transition-all duration-700"
+            style={{
+                background: 'rgba(2, 12, 27, 0.7)',
+                backdropFilter: 'blur(40px)',
+                WebkitBackdropFilter: 'blur(40px)',
+                borderRadius: '60px',
+                boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+            }}
+          >
+            <Pencil className="w-14 h-14 text-[#10B981] mb-12 transition-transform group-hover:scale-110" />
+            <h3 className="text-3xl font-medium mb-6 text-white">Геометрия</h3>
+            <p className="text-slate-300 leading-relaxed text-xl font-light">
               Высокоточное создание полигонов и линий с привязкой к координатной сетке для актуализации природных и техногенных объектов.
             </p>
           </div>
-          <div className="group p-12 bg-white/[0.03] border border-white/5 hover:border-[#0077FF] transition-all duration-700 backdrop-blur-xl rounded-[40px]">
-            <Layers className="w-12 h-12 text-[#0077FF] mb-10 transition-transform group-hover:scale-110" />
-            <h3 className="text-2xl font-medium mb-5 text-white">Атрибуция</h3>
-            <p className="text-slate-400 leading-relaxed text-lg">
+          <div 
+            className="group p-16 border border-white/5 hover:border-[#0077FF] transition-all duration-700"
+            style={{
+                background: 'rgba(2, 12, 27, 0.7)',
+                backdropFilter: 'blur(40px)',
+                WebkitBackdropFilter: 'blur(40px)',
+                borderRadius: '60px',
+                boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+            }}
+          >
+            <Layers className="w-14 h-14 text-[#0077FF] mb-12 transition-transform group-hover:scale-110" />
+            <h3 className="text-3xl font-medium mb-6 text-white">Атрибуция</h3>
+            <p className="text-slate-300 leading-relaxed text-xl font-light">
               Гибкое управление семантическими данными: классификация объектов, настройка визуальных стилей и добавление метаданных.
             </p>
           </div>
-          <div className="group p-12 bg-white/[0.03] border border-white/5 hover:border-[#10B981] transition-all duration-700 backdrop-blur-xl rounded-[40px]">
-            <Globe className="w-12 h-12 text-[#10B981] mb-10 transition-transform group-hover:scale-110" />
-            <h3 className="text-2xl font-medium mb-5 text-white">Интеграция</h3>
-            <p className="text-slate-400 leading-relaxed text-lg">
+          <div 
+            className="group p-16 border border-white/5 hover:border-[#10B981] transition-all duration-700"
+            style={{
+                background: 'rgba(2, 12, 27, 0.7)',
+                backdropFilter: 'blur(40px)',
+                WebkitBackdropFilter: 'blur(40px)',
+                borderRadius: '60px',
+                boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+            }}
+          >
+            <Globe className="w-14 h-14 text-[#10B981] mb-12 transition-transform group-hover:scale-110" />
+            <h3 className="text-3xl font-medium mb-6 text-white">Интеграция</h3>
+            <p className="text-slate-300 leading-relaxed text-xl font-light">
               Экспорт данных в индустриальные форматы GeoJSON и PMTiles для бесшовного использования в профессиональных ГИС-системах.
             </p>
           </div>
@@ -298,30 +320,30 @@ export default function Landing() {
 
       {/* ─── FOOTER ────────────────────────────────────────── */}
       <footer
-        className="pb-20 pt-10 flex flex-col items-center justify-center relative"
+        className="flex flex-col items-center justify-end relative mt-32 h-[50vh]"
         style={{ zIndex: 2 }}
       >
         <div 
-          className="flex flex-col items-center gap-12 p-16 w-[92%] max-w-7xl border border-white/5 shadow-2xl"
+          className="flex flex-col items-center justify-center gap-16 p-24 w-[95%] max-w-[1600px] border-x border-t border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.5)] h-full"
           style={{
-            background: 'rgba(2, 12, 27, 0.6)',
-            backdropFilter: 'blur(30px)',
-            WebkitBackdropFilter: 'blur(30px)',
-            borderRadius: '60px',
+            background: 'rgba(2, 12, 27, 0.8)',
+            backdropFilter: 'blur(50px)',
+            WebkitBackdropFilter: 'blur(50px)',
+            borderRadius: '100px 100px 0 0',
           }}
         >
           <button
             onClick={() => setAuthMode('login')}
-            className="px-16 py-5 border border-[#10B981] text-[#10B981] text-xl font-bold hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-700 rounded-full tracking-widest uppercase"
+            className="px-20 py-7 border border-[#10B981] text-[#10B981] text-3xl font-black hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-700 rounded-full tracking-[0.4em] uppercase"
           >
-            Terminal Start
+            ACCESS MAP
           </button>
           
           <div className="text-center">
-            <p className="text-[10px] text-[#10B981] tracking-[0.6em] uppercase mb-4 font-black">
-              Global Topography
+            <p className="text-[11px] text-[#10B981] tracking-[0.8em] uppercase mb-6 font-black opacity-80">
+              Global Topography Platform
             </p>
-            <p className="text-3xl text-white font-normal" style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
+            <p className="text-6xl text-white font-normal" style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
               freshmap team
             </p>
           </div>
