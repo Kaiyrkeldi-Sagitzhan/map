@@ -153,15 +153,15 @@ export default function Landing() {
 
       {/* ─── HEADER ────────────────────────────────────────── */}
       <header
-        className="fixed top-6 left-1/2 -translate-x-1/2 h-[64px] flex items-center justify-between px-10 w-[90%] max-w-[1400px]"
+        className="fixed top-6 left-1/2 -translate-x-1/2 h-[64px] flex items-center justify-between px-10 w-[95%] max-w-[1600px]"
         style={{
-          background: 'rgba(2, 12, 27, 0.4)',
-          backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'rgba(2, 12, 27, 0.75)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '100px',
           zIndex: 100,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+          boxShadow: '0 15px 40px rgba(0,0,0,0.5)',
         }}
       >
         <div className="flex items-center select-none">
@@ -223,18 +223,18 @@ export default function Landing() {
       {/* ─── ABOUT ─────────────────────────────────────────── */}
       <section
         ref={aboutRef}
-        className="min-h-[80vh] px-6 lg:px-20 py-32 relative flex flex-col items-center"
+        className="min-h-[80vh] px-4 lg:px-8 py-32 relative flex flex-col items-center"
         style={{ zIndex: 2 }}
       >
-        <div className="w-full max-w-[1400px] lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-24 mb-32">
+        <div className="w-full max-w-[1600px] lg:grid lg:grid-cols-[1.2fr_0.8fr] lg:gap-24 mb-32">
           <div
-            className="scroll-reveal p-12 md:p-16 border border-white/5"
+            className="scroll-reveal p-8 md:p-14 lg:p-20 border border-white/5"
             style={{
-              background: 'rgba(2, 12, 27, 0.7)',
-              backdropFilter: 'blur(45px)',
-              WebkitBackdropFilter: 'blur(45px)',
+              background: 'rgba(2, 12, 27, 0.75)',
+              backdropFilter: 'blur(50px)',
+              WebkitBackdropFilter: 'blur(50px)',
               borderRadius: '60px',
-              boxShadow: '0 40px 80px rgba(0,0,0,0.4)',
+              boxShadow: '0 40px 80px rgba(0,0,0,0.5)',
             }}
           >
             <h2
@@ -267,7 +267,7 @@ export default function Landing() {
         </div>
 
         {/* Tools */}
-        <div className="scroll-reveal grid grid-cols-1 md:grid-cols-3 gap-10 w-full max-w-[1400px]">
+        <div className="scroll-reveal grid grid-cols-1 md:grid-cols-3 gap-10 w-full max-w-[1600px]">
           <div 
             className="group p-10 border border-white/5 hover:border-[#10B981] transition-all duration-700"
             style={{
@@ -325,9 +325,9 @@ export default function Landing() {
         style={{ zIndex: 2 }}
       >
         <div 
-          className="flex flex-col items-center justify-center gap-10 p-16 w-[90%] max-w-[1400px] border-x border-t border-white/10 shadow-[0_-15px_40px_rgba(0,0,0,0.4)] h-full"
+          className="flex flex-col items-center justify-center gap-10 p-16 w-[95%] max-w-[1600px] border-x border-t border-white/10 shadow-[0_-15px_40px_rgba(0,0,0,0.4)] h-full"
           style={{
-            background: 'rgba(2, 12, 27, 0.8)',
+            background: 'rgba(2, 12, 27, 0.85)',
             backdropFilter: 'blur(45px)',
             WebkitBackdropFilter: 'blur(45px)',
             borderRadius: '80px 80px 0 0',
