@@ -42,7 +42,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md mx-4 rounded-sm border border-white/10 p-10 shadow-2xl overflow-hidden"
+      <div className="relative w-full max-w-md mx-4 rounded-[40px] border border-white/10 p-10 shadow-2xl overflow-hidden"
         style={{ 
           background: 'rgba(2, 12, 27, 0.75)', 
           backdropFilter: 'blur(40px)',

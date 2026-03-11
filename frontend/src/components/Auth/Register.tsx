@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { Map, Mail, Lock, ArrowRight } from 'lucide-react'
+import { Mail, Lock, ArrowRight } from 'lucide-react'
 
 export default function Register() {
   const [email, setEmail] = useState('')
@@ -47,35 +47,36 @@ export default function Register() {
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <Map className="w-7 h-7 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-white">
-            Geo<span className="text-emerald-400">KZ</span>
+          <span className="text-[32px] font-normal tracking-wide text-[#10B981]"
+                style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
+            freshmap
           </span>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-[40px] p-10 shadow-2xl">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-white mb-2">Создать аккаунт</h1>
-            <p className="text-slate-400">Присоединяйтесь к геопорталу</p>
+            <h1 className="text-3xl font-normal text-[#10B981] mb-2"
+                style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
+              Создать аккаунт
+            </h1>
+            <p className="text-slate-400 text-xs uppercase tracking-[0.2em]">join the ecosystem</p>
           </div>
           
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+            <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-xs text-center">
               {error}
             </div>
           )}
           
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
+              <label htmlFor="email" className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
                 Электронная почта
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Mail className="w-5 h-5 text-slate-500" />
+                  <Mail className="w-4 h-4 text-slate-600" />
                 </div>
                 <input
                   type="email"
@@ -83,19 +84,19 @@ export default function Register() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  placeholder="you@example.com"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  placeholder="identity@freshmap.team"
+                  className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                 />
               </div>
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
+              <label htmlFor="password" className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
                 Пароль
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="w-5 h-5 text-slate-500" />
+                  <Lock className="w-4 h-4 text-slate-600" />
                 </div>
                 <input
                   type="password"
@@ -104,19 +105,18 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  minLength={6}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
+              <label htmlFor="confirmPassword" className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
                 Подтвердите пароль
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="w-5 h-5 text-slate-500" />
+                  <Lock className="w-4 h-4 text-slate-600" />
                 </div>
                 <input
                   type="password"
@@ -125,7 +125,7 @@ export default function Register() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   placeholder="••••••••"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                 />
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function Register() {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 px-4 bg-transparent border border-[#10B981] text-[#10B981] font-bold rounded-full transition-all duration-500 flex items-center justify-center gap-2 hover:bg-[#10B981] hover:text-[#020C1B] disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest text-sm"
             >
               {loading ? (
                 <span>Создание...</span>
@@ -146,10 +146,10 @@ export default function Register() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-slate-400">
+          <div className="mt-8 text-center">
+            <p className="text-[11px] text-slate-500 uppercase tracking-widest">
               Уже есть аккаунт?{' '}
-              <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">
+              <Link to="/" className="text-[#10B981] hover:underline font-bold">
                 Войти
               </Link>
             </p>
