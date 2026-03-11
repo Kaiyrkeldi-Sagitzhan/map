@@ -42,58 +42,64 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
       />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 p-8 shadow-2xl"
-        style={{ background: 'rgba(10, 25, 47, 0.95)', backdropFilter: 'blur(20px)' }}
+      <div className="relative w-full max-w-md mx-4 rounded-sm border border-white/10 p-10 shadow-2xl overflow-hidden"
+        style={{ 
+          background: 'rgba(2, 12, 27, 0.75)', 
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
+        }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+          className="absolute top-6 right-6 text-slate-400 hover:text-[#10B981] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-2xl font-bold text-white mb-2 text-center">
-          {mode === 'login' ? 'Добро пожаловать' : 'Создать аккаунт'}
+        <h2 className="text-3xl font-normal text-[#10B981] mb-2 text-center"
+            style={{ fontFamily: "'IM Fell Great Primer', serif" }}>
+          {mode === 'login' ? 'freshmap access' : 'create account'}
         </h2>
-        <p className="text-slate-400 text-center mb-6">
+        <p className="text-slate-400 text-center mb-8 text-sm uppercase tracking-[0.2em]">
           {mode === 'login'
-            ? 'Войдите для доступа к редактору'
-            : 'Зарегистрируйтесь для начала работы'}
+            ? 'topographic mapping system'
+            : 'join the ecosystem'}
         </p>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-sm text-red-400 text-xs tracking-wide text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Электронная почта
+            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em]">
+              Email Address
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="w-4 h-4 text-slate-500" />
+                <Mail className="w-4 h-4 text-slate-600" />
               </div>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]/30 transition-colors"
+                placeholder="identity@freshmap.team"
+                className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/5 rounded-sm text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">
-              Пароль
+            <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em]">
+              Security Key
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="w-4 h-4 text-slate-500" />
+                <Lock className="w-4 h-4 text-slate-600" />
               </div>
               <input
                 type="password"
@@ -102,7 +108,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                 required
                 placeholder="••••••••"
                 minLength={6}
-                className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]/30 transition-colors"
+                className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/5 rounded-sm text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
               />
             </div>
           </div>
@@ -110,34 +116,34 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-[#FFD700] text-[#0A192F] font-semibold rounded-lg hover:bg-[#FFE44D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 bg-transparent border border-[#10B981] text-[#10B981] font-medium rounded-sm hover:bg-[#10B981] hover:text-[#020C1B] transition-all duration-500 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest text-sm"
           >
             {loading
-              ? (mode === 'login' ? 'Вход...' : 'Создание...')
-              : (mode === 'login' ? 'Войти' : 'Создать аккаунт')
+              ? (mode === 'login' ? 'Verifying...' : 'Processing...')
+              : (mode === 'login' ? 'Authorize' : 'Register')
             }
           </button>
         </form>
 
-        <div className="mt-5 text-center text-sm text-slate-400">
+        <div className="mt-8 text-center text-[11px] text-slate-500 uppercase tracking-widest">
           {mode === 'login' ? (
             <>
-              Нет аккаунта?{' '}
+              No credentials?{' '}
               <button
                 onClick={() => onSwitchMode('register')}
-                className="text-[#FFD700] hover:text-[#FFE44D] font-medium"
+                className="text-[#10B981] hover:underline"
               >
-                Зарегистрироваться
+                Create Account
               </button>
             </>
           ) : (
             <>
-              Уже есть аккаунт?{' '}
+              Already recognized?{' '}
               <button
                 onClick={() => onSwitchMode('login')}
-                className="text-[#FFD700] hover:text-[#FFE44D] font-medium"
+                className="text-[#10B981] hover:underline"
               >
-                Войти
+                Sign In
               </button>
             </>
           )}

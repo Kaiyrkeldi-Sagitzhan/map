@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+Great+Primer:ital@0;1&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,14 +8,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg-base: #0f172a;
-  --bg-surface: #1e293b;
-  --bg-elevated: #334155;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-color: #334155;
-  --accent: #6366f1;
+  --bg-base: #020C1B;
+  --bg-surface: #0A192F;
+  --bg-elevated: #112240;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CCD6F6;
+  --text-muted: #8892B0;
+  --border-color: #233554;
+  --accent-blue: #0077FF;
+  --accent-green: #10B981;
   --transition-theme: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
