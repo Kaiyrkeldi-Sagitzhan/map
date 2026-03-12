@@ -141,6 +141,34 @@ services:
       - kzmap-network
     restart: unless-stopped
 
+  # Auto-initialization service
+  init-db:
+    image: postgis/postgis:15-3.3
+    container_name: kzmap-init-db
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      PGPASSWORD: kzmap_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kzmap-network
+    entrypoint: >
+      sh -c "
+      echo 'Checking database state...'
+      count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM information_schema.tables WHERE table_name = 'geo_objects';\")
+      if [ $$count -eq 0 ]; then
+        echo 'Database empty. Running migrations and import...'
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
+        ./load_all_gpkg.sh
+      else
+        echo 'Database already initialized.'
+      fi
+      "
+
 volumes:
   postgres_data:
 

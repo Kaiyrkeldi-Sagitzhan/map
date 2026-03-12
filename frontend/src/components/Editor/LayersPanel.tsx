@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useEditorStore } from '../../store/editorStore'
 import { getSafeStyle, getSafeLabel } from '../../types/editor'
 import type { EditHistoryEntry, EditorFeature } from '../../types/editor'
-import { Download, Layers, Clock } from 'lucide-react'
+import { Download, Layers, Clock, Trash2 } from 'lucide-react'
 import { apiService } from '../../services/api'
 
 const ACTION_LABELS: Record<EditHistoryEntry['action'], { label: string; color: string }> = {
@@ -173,6 +173,10 @@ export default function LayersPanel() {
                                                     onSelect={() => setSelectedFeature(feature.id)}
                                                     onToggleVisibility={() => toggleFeatureVisibility(feature.id)}
                                                     onToggleLock={() => toggleFeatureLock(feature.id)}
+                                                    onRemove={() => {
+                                                        const state = useEditorStore.getState()
+                                                        state.deleteFeature(feature.id)
+                                                    }}
                                                 />
                                             ))}
                                         </div>
@@ -284,7 +288,7 @@ export default function LayersPanel() {
     )
 }
 
-function FeatureItem({ feature, isSelected, onSelect, onToggleVisibility, onToggleLock }: any) {
+function FeatureItem({ feature, isSelected, onSelect, onToggleVisibility, onToggleLock, onRemove }: any) {
     const updateFeature = useEditorStore((s) => s.updateFeature)
     const [editing, setEditing] = useState(false)
     const [name, setName] = useState(feature.name)
@@ -318,6 +322,9 @@ function FeatureItem({ feature, isSelected, onSelect, onToggleVisibility, onTogg
                 ) : (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 019.9-1" /></svg>
                 )}
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); if (confirm('Убрать объект из проекта? (История сохранится)')) onRemove() }} className="text-slate-600 hover:text-red-400 transition-colors" title="Убрать из проекта">
+                <Trash2 size={12} />
             </button>
         </div>
     )
