@@ -169,7 +169,7 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 		whereSQL = " WHERE " + strings.Join(whereClauses, " AND ")
 	}
 
-	query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects` + whereSQL + ` ORDER BY created_at DESC LIMIT 50`
+	query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects` + whereSQL + ` ORDER BY created_at DESC LIMIT 1000`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

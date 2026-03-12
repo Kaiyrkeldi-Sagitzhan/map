@@ -68,9 +68,6 @@ func main() {
 	// Setup Gin router
 	router := gin.Default()
 
-	// CORS is handled by Nginx gateway
-	// router.Use(middleware.CORSMiddleware())
-
 	// Health check
 	router.GET("/health", geoObjectHandler.HealthCheck)
 
