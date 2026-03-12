@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"map-service/internal/model"
 
@@ -135,48 +136,40 @@ func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string, metaFilters map[string]string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
+	whereClauses := []string{"1=1"}
 
-	// Build search filter
-	searchFilter := ""
-	addSearch := func() {
-		if search != "" {
-			idx := len(args) + 1
-			searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", idx, idx)
-			args = append(args, search)
-		}
-		// Add metadata filters
-		for k, v := range metaFilters {
-			idx := len(args) + 1
-			searchFilter += fmt.Sprintf(" AND metadata->>'%s' = $%d", k, idx)
-			args = append(args, v)
+	if !isAdmin {
+		whereClauses = append(whereClauses, fmt.Sprintf("(scope = 'global' OR owner_id = $%d)", len(args)+1))
+		args = append(args, userID)
+	}
+
+	if objType != "" {
+		if objType == "lake" {
+			whereClauses = append(whereClauses, "(type IN ('lake', 'water', 'reservoir') OR metadata->>'fclass' IN ('lake', 'water', 'reservoir'))")
+		} else if objType == "mountain" || objType == "peak" {
+			whereClauses = append(whereClauses, "(type IN ('mountain', 'peak') OR metadata->>'fclass' IN ('mountain', 'peak'))")
+		} else {
+			whereClauses = append(whereClauses, fmt.Sprintf("(type = $%d OR metadata->>'fclass' = $%d)", len(args)+1, len(args)+1))
+			args = append(args, objType)
 		}
 	}
 
-	if isAdmin {
-		if objType != "" {
-			args = []interface{}{objType}
-			addSearch()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE type = $1` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
-		} else {
-			addSearch()
-			if searchFilter != "" {
-				// Remove leading " AND " for WHERE clause
-				query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE` + searchFilter[4:] + ` ORDER BY created_at DESC LIMIT 50`
-			} else {
-				query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects ORDER BY created_at DESC`
-			}
-		}
-	} else {
-		if objType != "" {
-			args = []interface{}{userID, objType}
-			addSearch()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1) AND type = $2` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
-		} else {
-			args = []interface{}{userID}
-			addSearch()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $1)` + searchFilter + ` ORDER BY created_at DESC LIMIT 50`
-		}
+	if search != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1))
+		args = append(args, search)
 	}
+
+	for k, v := range metaFilters {
+		whereClauses = append(whereClauses, fmt.Sprintf("metadata->>'%s' = $%d", k, len(args)+1))
+		args = append(args, v)
+	}
+
+	whereSQL := ""
+	if len(whereClauses) > 0 {
+		whereSQL = " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects` + whereSQL + ` ORDER BY created_at DESC LIMIT 50`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -230,61 +223,48 @@ func typesForZoom(zoom int) []string {
 func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string, metaFilters map[string]string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
+	whereClauses := []string{"geometry && ST_MakeEnvelope($1, $2, $3, $4, 4326)"}
+	args = []interface{}{minLng, minLat, maxLng, maxLat}
 
-	bboxSQL := "ST_MakeEnvelope($1, $2, $3, $4, 4326)"
-	geomSQL := "ST_AsGeoJSON(ST_MakeValid(geometry)) as geometry"
+	if !isAdmin {
+		whereClauses = append(whereClauses, fmt.Sprintf("(scope = 'global' OR owner_id = $%d)", len(args)+1))
+		args = append(args, userID)
+	}
 
-	zoomFilter := ""
-	if objType == "" && filterByZoom {
+	if objType != "" {
+		if objType == "lake" {
+			whereClauses = append(whereClauses, "(type IN ('lake', 'water', 'reservoir') OR metadata->>'fclass' IN ('lake', 'water', 'reservoir'))")
+		} else if objType == "mountain" || objType == "peak" {
+			whereClauses = append(whereClauses, "(type IN ('mountain', 'peak') OR metadata->>'fclass' IN ('mountain', 'peak'))")
+		} else {
+			whereClauses = append(whereClauses, fmt.Sprintf("(type = $%d OR metadata->>'fclass' = $%d)", len(args)+1, len(args)+1))
+			args = append(args, objType)
+		}
+	} else if filterByZoom {
 		allowed := typesForZoom(zoom)
 		if allowed != nil {
-			zoomFilter = " AND type IN ("
+			typesSQL := "type IN ("
 			for i, t := range allowed {
-				if i > 0 {
-					zoomFilter += ","
-				}
-				zoomFilter += fmt.Sprintf("'%s'", t)
+				if i > 0 { typesSQL += "," }
+				typesSQL += fmt.Sprintf("'%s'", t)
 			}
-			zoomFilter += ")"
+			typesSQL += ")"
+			whereClauses = append(whereClauses, typesSQL)
 		}
 	}
 
-	// Dynamic filters helper
-	addFilters := func() string {
-		f := ""
-		if search != "" {
-			f += fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
-			args = append(args, search)
-		}
-		// Add metadata filters
-		for k, v := range metaFilters {
-			f += fmt.Sprintf(" AND metadata->>'%s' = $%d", k, len(args)+1)
-			args = append(args, v)
-		}
-		return f
+	if search != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1))
+		args = append(args, search)
 	}
 
-	if isAdmin {
-		if objType != "" {
-			args = []interface{}{minLng, minLat, maxLng, maxLat, objType}
-			searchFilter := addFilters()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE type = $5 AND geometry && ` + bboxSQL + searchFilter
-		} else {
-			args = []interface{}{minLng, minLat, maxLng, maxLat}
-			searchFilter := addFilters()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE geometry && ` + bboxSQL + zoomFilter + searchFilter
-		}
-	} else {
-		if objType != "" {
-			args = []interface{}{minLng, minLat, maxLng, maxLat, userID, objType}
-			searchFilter := addFilters()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $5) AND type = $6 AND geometry && ` + bboxSQL + searchFilter
-		} else {
-			args = []interface{}{minLng, minLat, maxLng, maxLat, userID}
-			searchFilter := addFilters()
-			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $5) AND geometry && ` + bboxSQL + zoomFilter + searchFilter
-		}
+	for k, v := range metaFilters {
+		whereClauses = append(whereClauses, fmt.Sprintf("metadata->>'%s' = $%d", k, len(args)+1))
+		args = append(args, v)
 	}
+
+	geomSQL := "ST_AsGeoJSON(ST_MakeValid(geometry)) as geometry"
+	query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE ` + strings.Join(whereClauses, " AND ")
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

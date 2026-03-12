@@ -37,13 +37,14 @@ func (s *GeoObjectHistoryService) GetByObjectID(ctx context.Context, objectID uu
 		if err == nil && obj != nil {
 			// Create a snapshot of current state
 			snapshot, _ := json.Marshal(obj)
+			snapRaw := json.RawMessage(snapshot)
 			return []dto.GeoObjectHistoryResponse{
 				{
 					ID:          uuid.Nil,
 					ObjectID:    objectID,
 					Action:      "create",
 					Description: "Исходное состояние (импортировано)",
-					AfterSnapshot: snapshot,
+					AfterSnapshot: &snapRaw,
 					CreatedAt:   obj.CreatedAt,
 				},
 			}, nil
@@ -73,18 +74,12 @@ func (s *GeoObjectHistoryService) Rollback(ctx context.Context, historyID uuid.U
 		return err
 	}
 
-	// For rollback, we use the before_snapshot if it exists (for update/delete)
-	// or the after_snapshot if we want to restore specifically that state.
-	// Typically, a user selects a point in history they want to RETURN TO.
-	// So we use the after_snapshot of that entry.
-	
 	snapshot := entry.AfterSnapshot
 	if entry.Action == "delete" {
-		// If rolling back a delete, we use the state before it was deleted
 		snapshot = entry.BeforeSnapshot
 	}
 
-	if len(snapshot) == 0 || string(snapshot) == "null" {
+	if snapshot == nil || len(*snapshot) == 0 || string(*snapshot) == "null" {
 		return errors.New("cannot rollback: no snapshot data available")
 	}
 
@@ -93,11 +88,11 @@ func (s *GeoObjectHistoryService) Rollback(ctx context.Context, historyID uuid.U
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
 			// Restore deleted object
-			return s.objectRepo.RestoreFromSnapshot(ctx, entry.ObjectID, snapshot)
+			return s.objectRepo.RestoreFromSnapshot(ctx, entry.ObjectID, *snapshot)
 		}
 		return err
 	}
 
 	// Update existing object
-	return s.objectRepo.UpdateFromSnapshot(ctx, entry.ObjectID, snapshot)
+	return s.objectRepo.UpdateFromSnapshot(ctx, entry.ObjectID, *snapshot)
 }

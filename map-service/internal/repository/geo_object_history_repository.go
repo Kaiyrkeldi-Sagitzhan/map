@@ -30,7 +30,7 @@ func (r *GeoObjectHistoryRepository) GetByObjectID(ctx context.Context, objectID
 		LIMIT $2
 	`
 	
-	var history []model.GeoObjectHistory
+	history := make([]model.GeoObjectHistory, 0)
 	err := r.db.SelectContext(ctx, &history, query, objectID, limit)
 	return history, err
 }
@@ -58,22 +58,11 @@ func (r *GeoObjectHistoryRepository) GetByID(ctx context.Context, id uuid.UUID) 
 func (r *GeoObjectHistoryRepository) Create(ctx context.Context, entry *model.GeoObjectHistory) error {
 	query := `
 		INSERT INTO geo_object_history (id, object_id, user_id, action, description, before_snapshot, after_snapshot, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
-	// Convert json.RawMessage to string so lib/pq sends it as text, not bytea.
-	// PostgreSQL can cast text to jsonb but not bytea to jsonb.
-	var beforeStr, afterStr *string
-	if len(entry.BeforeSnapshot) > 0 {
-		s := string(entry.BeforeSnapshot)
-		beforeStr = &s
-	}
-	if len(entry.AfterSnapshot) > 0 {
-		s := string(entry.AfterSnapshot)
-		afterStr = &s
-	}
 	_, err := r.db.ExecContext(ctx, query,
 		entry.ID, entry.ObjectID, entry.UserID, entry.Action,
-		entry.Description, beforeStr, afterStr, entry.CreatedAt,
+		entry.Description, entry.BeforeSnapshot, entry.AfterSnapshot, entry.CreatedAt,
 	)
 	return err
 }

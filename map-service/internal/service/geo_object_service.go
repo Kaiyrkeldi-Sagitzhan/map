@@ -101,7 +101,7 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 				UserID:        userID,
 				Action:        "create",
 				Description:   fmt.Sprintf("Создан объект \"%s\"", obj.Name),
-				AfterSnapshot: afterSnap,
+				AfterSnapshot: &afterSnap,
 				CreatedAt:     now,
 			}
 			if err := s.historyRepo.Create(ctx, historyEntry); err != nil {
@@ -366,8 +366,8 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 			UserID:         userID,
 			Action:         "update",
 			Description:    fmt.Sprintf("Изменён объект \"%s\"", updated.Name),
-			BeforeSnapshot: beforeSnap,
-			AfterSnapshot:  afterSnap,
+			BeforeSnapshot: &beforeSnap,
+			AfterSnapshot:  &afterSnap,
 			CreatedAt:      now,
 		}
 		if err := s.historyRepo.Create(ctx, historyEntry); err != nil {
