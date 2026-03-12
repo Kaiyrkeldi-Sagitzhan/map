@@ -67,6 +67,7 @@ export default function VectorTileLayer() {
 
         return () => {
             if (layerRef.current) {
+                layerRef.current.off('click')
                 map.removeLayer(layerRef.current)
             }
         }

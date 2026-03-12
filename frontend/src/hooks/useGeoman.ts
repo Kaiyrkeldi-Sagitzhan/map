@@ -53,9 +53,18 @@ export function useGeoman() {
 
     const searchLayers = useRef<L.Layer[]>([])
 
-    // ─── Track Shift key ─────────────────────────────────────
+    // ─── Track Keys (Shift & Escape) ────────────────────────
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Shift') isShiftHeld.current = true }
+        const handleKeyDown = (e: KeyboardEvent) => { 
+            if (e.key === 'Shift') isShiftHeld.current = true 
+            if (e.key === 'Escape') {
+                setSelectedFeature(null)
+                useEditorStore.getState().clearSearchResults()
+                // Also disable any active geoman draw/edit
+                map.pm.disableDraw()
+                map.pm.disableGlobalEditMode()
+            }
+        }
         const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') isShiftHeld.current = false }
         window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
@@ -63,7 +72,7 @@ export function useGeoman() {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [])
+    }, [map, setSelectedFeature])
 
     // ─── Sync search results to map ──────────────────────────
     useEffect(() => {
@@ -111,6 +120,10 @@ export function useGeoman() {
             layer.eachLayer(l => {
                 l.on('click', (e) => {
                    L.DomEvent.stopPropagation(e)
+                   // Contextual check: only allow adding if type matches or 'custom' is selected
+                   if (featureClass !== 'custom' && featureClass !== 'other' && f.featureClass !== featureClass) {
+                       return // Ignore click on wrong type
+                   }
                    if (confirm(`Добавить "${f.name}" в проект?`)) {
                        const newF = { ...f, id: crypto.randomUUID() }
                        addFeature(newF)
@@ -175,20 +188,12 @@ export function useGeoman() {
         }
 
         try {
-            // Contextual filtering: if a specific class is selected (not 'custom'/'other'), use it as a filter
-            let typeFilter = ''
-            if (featureClass !== 'custom' && featureClass !== 'other') {
-                // Map local 'lake' to OSM 'water' for better API results if necessary
-                typeFilter = featureClass === 'lake' ? 'water' : featureClass
-            }
-
+            const typeFilter = (featureClass === 'custom' || featureClass === 'other') ? '' : featureClass
             const res = await apiService.getGeoObjects(typeFilter, bbox)
-            console.log('[pickObjectAt] API returned', res.objects?.length, 'objects')
+            
             if (res.objects && res.objects.length > 0) {
                 const obj = res.objects[0]
-                console.log('[pickObjectAt] picked object:', obj.name, 'type:', obj.type)
                 
-                // Check if already in features list by backendId
                 const existing = useEditorStore.getState().features.find(
                     (f) => f.backendId === obj.id || f.id === obj.id
                 )
@@ -197,8 +202,11 @@ export function useGeoman() {
                 if (existing) {
                     targetFid = existing.id
                 } else {
-                    // CRITICAL: Use the real ID from database as the local ID
-                    // This ensures stability for history and sync
+                    // NEW: Confirmation prompt before adding to project
+                    if (!confirm(`Вы хотите добавить объект "${obj.name || 'без названия'}" в проект для редактирования?`)) {
+                        return
+                    }
+
                     const newFeature: EditorFeature = {
                         id: obj.id, 
                         name: obj.name || 'Объект',
@@ -212,6 +220,7 @@ export function useGeoman() {
                         metadata: obj.metadata as any,
                     }
                     addFeature(newFeature)
+                    saveFeatureToBackend(newFeature)
                     targetFid = newFeature.id
                 }
                 
@@ -219,15 +228,12 @@ export function useGeoman() {
                     setSelectedFeature(targetFid)
                 }
 
-                // If edit mode is active, enable editing on this layer
+                // Auto-enable geoman edit only if in EDIT mode (not history)
                 if (currentTool === 'edit') {
-                    // We need a short delay to let the layer be added/selected
                     setTimeout(() => {
                         const layer = featureIdToLayer.current.get(targetFid)
-                        if (layer) {
-                            (layer as any).pm?.enable({ allowSelfIntersection: false })
-                        }
-                    }, 50)
+                        if (layer) (layer as any).pm?.enable({ allowSelfIntersection: false })
+                    }, 100)
                 }
             }
         } catch (err) {
@@ -235,7 +241,7 @@ export function useGeoman() {
         } finally {
             setLoading(false)
         }
-    }, [map, addFeature, setSelectedFeature, setLoading, currentTool])
+    }, [map, addFeature, setSelectedFeature, setLoading, currentTool, featureClass])
 
     useEffect(() => {
         if (!map) return
@@ -387,16 +393,24 @@ export function useGeoman() {
     }, [deleteFeature])
 
     useEffect(() => {
-        if (!map) return
-        map.on('pm:create', handleCreate)
-        map.on('pm:edit', handleEdit)
-        map.on('pm:dragend', handleEdit)
-        map.on('pm:remove', handleRemove)
+        if (!map || !map.pm) return
+        
+        const onCreate = (e: any) => handleCreate(e)
+        const onEdit = (e: any) => handleEdit(e)
+        const onRemove = (e: any) => handleRemove(e)
+
+        map.on('pm:create', onCreate)
+        map.on('pm:edit', onEdit)
+        map.on('pm:dragend', onEdit)
+        map.on('pm:remove', onRemove)
+
         return () => {
-            map.off('pm:create', handleCreate)
-            map.off('pm:edit', handleEdit)
-            map.off('pm:dragend', handleEdit)
-            map.off('pm:remove', handleRemove)
+            if (map && map.pm) {
+                map.off('pm:create', onCreate)
+                map.off('pm:edit', onEdit)
+                map.off('pm:dragend', onEdit)
+                map.off('pm:remove', onRemove)
+            }
         }
     }, [map, handleCreate, handleEdit, handleRemove])
 
@@ -431,13 +445,25 @@ export function useGeoman() {
                 featureIdToLayer.current.set(f.id, layer)
                 layer.on('click', (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e)
+                    
+                    // Contextual pick: restrict selection to the active type if in edit/history mode
+                    const state = useEditorStore.getState()
+                    const activeTool = state.currentTool
+                    const activeType = state.featureClass
+                    
+                    if (activeTool === 'edit' || activeTool === 'history') {
+                        if (activeType !== 'custom' && activeType !== 'other' && f.featureClass !== activeType) {
+                            console.log('[useGeoman] Selection ignored: type mismatch', f.featureClass, 'vs active:', activeType)
+                            return // Ignore click on wrong type
+                        }
+                    }
+
                     setSelectedFeature(f.id)
                 })
                 
                 // CRITICAL: Attach edit listeners to the specific layer
                 layer.on('pm:edit', handleEdit)
                 layer.on('pm:dragend', handleEdit)
-                layer.on('pm:update', handleEdit)
 
                 if (f.visible) layer.addTo(map)
             })

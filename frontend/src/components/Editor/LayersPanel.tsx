@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore'
 import { getSafeStyle, getSafeLabel } from '../../types/editor'
 import type { EditHistoryEntry, EditorFeature } from '../../types/editor'
 import { Download, Layers, Clock } from 'lucide-react'
+import { apiService } from '../../services/api'
 
 const ACTION_LABELS: Record<EditHistoryEntry['action'], { label: string; color: string }> = {
     create: { label: 'Создание', color: 'bg-green-500' },
@@ -91,15 +92,33 @@ export default function LayersPanel() {
         try {
             await rollbackToHistory(rollbackPopup.id)
             if (selectedFeatureId) {
+                // Fetch the restored object data from backend to sync local state
                 const state = useEditorStore.getState()
                 const feat = state.features.find(f => f.id === selectedFeatureId)
                 const backendId = feat?.backendId || selectedFeatureId
-                fetchFeatureHistory(backendId)
+                
+                try {
+                    const restoredObj = await apiService.getGeoObjectById(backendId)
+                    if (restoredObj) {
+                        state.updateFeature(selectedFeatureId, {
+                            geometry: restoredObj.geometry as any,
+                            metadata: restoredObj.metadata as any,
+                            name: restoredObj.name,
+                            description: restoredObj.description || ''
+                        })
+                    }
+                } catch (fetchErr) {
+                    console.error('[Rollback] Failed to fetch restored object:', fetchErr)
+                }
+
+                // Refresh history list
+                await fetchFeatureHistory(backendId)
+                // Trigger map visual refresh
+                window.dispatchEvent(new Event('refresh-map'))
             }
             setRollbackPopup(null)
-            // Note: In a real app, you'd trigger a map refresh here
-            window.location.reload()
         } catch (err) {
+            console.error('[Rollback] Error:', err)
             alert('Ошибка при откате изменений')
         }
     }, [rollbackPopup, selectedFeatureId, rollbackToHistory, fetchFeatureHistory])

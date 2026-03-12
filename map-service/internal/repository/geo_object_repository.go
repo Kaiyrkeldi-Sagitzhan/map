@@ -144,7 +144,7 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 	}
 
 	if objType != "" {
-		if objType == "lake" {
+		if objType == "lake" || objType == "water" {
 			whereClauses = append(whereClauses, "(type IN ('lake', 'water', 'reservoir') OR metadata->>'fclass' IN ('lake', 'water', 'reservoir'))")
 		} else if objType == "mountain" || objType == "peak" {
 			whereClauses = append(whereClauses, "(type IN ('mountain', 'peak') OR metadata->>'fclass' IN ('mountain', 'peak'))")
@@ -232,7 +232,7 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 	}
 
 	if objType != "" {
-		if objType == "lake" {
+		if objType == "lake" || objType == "water" {
 			whereClauses = append(whereClauses, "(type IN ('lake', 'water', 'reservoir') OR metadata->>'fclass' IN ('lake', 'water', 'reservoir'))")
 		} else if objType == "mountain" || objType == "peak" {
 			whereClauses = append(whereClauses, "(type IN ('mountain', 'peak') OR metadata->>'fclass' IN ('mountain', 'peak'))")
