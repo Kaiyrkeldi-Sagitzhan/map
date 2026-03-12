@@ -132,7 +132,7 @@ func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 }
 
 // GetAll retrieves all accessible geo objects (global + owned private)
-func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string) ([]model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string, metaFilters map[string]string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
 
@@ -143,6 +143,12 @@ func (r *GeoObjectRepository) GetAll(ctx context.Context, userID uuid.UUID, isAd
 			idx := len(args) + 1
 			searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", idx, idx)
 			args = append(args, search)
+		}
+		// Add metadata filters
+		for k, v := range metaFilters {
+			idx := len(args) + 1
+			searchFilter += fmt.Sprintf(" AND metadata->>'%s' = $%d", k, idx)
+			args = append(args, v)
 		}
 	}
 
@@ -221,7 +227,7 @@ func typesForZoom(zoom int) []string {
 }
 
 // GetByBBox retrieves geo objects within a bounding box
-func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string) ([]model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string, metaFilters map[string]string) ([]model.GeoObjectWithGeometry, error) {
 	var query string
 	var args []interface{}
 
@@ -243,40 +249,39 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 		}
 	}
 
+	// Dynamic filters helper
+	addFilters := func() string {
+		f := ""
+		if search != "" {
+			f += fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
+			args = append(args, search)
+		}
+		// Add metadata filters
+		for k, v := range metaFilters {
+			f += fmt.Sprintf(" AND metadata->>'%s' = $%d", k, len(args)+1)
+			args = append(args, v)
+		}
+		return f
+	}
+
 	if isAdmin {
 		if objType != "" {
 			args = []interface{}{minLng, minLat, maxLng, maxLat, objType}
-			searchFilter := ""
-			if search != "" {
-				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
-				args = append(args, search)
-			}
+			searchFilter := addFilters()
 			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE type = $5 AND geometry && ` + bboxSQL + searchFilter
 		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat}
-			searchFilter := ""
-			if search != "" {
-				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
-				args = append(args, search)
-			}
+			searchFilter := addFilters()
 			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE geometry && ` + bboxSQL + zoomFilter + searchFilter
 		}
 	} else {
 		if objType != "" {
 			args = []interface{}{minLng, minLat, maxLng, maxLat, userID, objType}
-			searchFilter := ""
-			if search != "" {
-				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
-				args = append(args, search)
-			}
+			searchFilter := addFilters()
 			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $5) AND type = $6 AND geometry && ` + bboxSQL + searchFilter
 		} else {
 			args = []interface{}{minLng, minLat, maxLng, maxLat, userID}
-			searchFilter := ""
-			if search != "" {
-				searchFilter = fmt.Sprintf(" AND (name ILIKE '%%' || $%d || '%%' OR description ILIKE '%%' || $%d || '%%')", len(args)+1, len(args)+1)
-				args = append(args, search)
-			}
+			searchFilter := addFilters()
 			query = `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ` + geomSQL + `, created_at, updated_at FROM geo_objects WHERE (scope = 'global' OR owner_id = $5) AND geometry && ` + bboxSQL + zoomFilter + searchFilter
 		}
 	}

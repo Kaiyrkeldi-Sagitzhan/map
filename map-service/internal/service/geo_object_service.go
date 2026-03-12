@@ -149,9 +149,9 @@ func (s *GeoObjectService) GetByID(ctx context.Context, id uuid.UUID, userID uui
 }
 
 // GetAll retrieves all accessible geo objects
-func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string) (*dto.GeoObjectListResponse, error) {
-	// Skip cache when text search is active
-	if s.cache != nil && search == "" {
+func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, search string, metaFilters map[string]string) (*dto.GeoObjectListResponse, error) {
+	// Skip cache when text search or metadata filters are active
+	if s.cache != nil && search == "" && len(metaFilters) == 0 {
 		cachedObjects, err := s.cache.GetList(ctx, userID, isAdmin, objType)
 		if err == nil && cachedObjects != nil {
 			responses := make([]dto.GeoObjectResponse, len(cachedObjects))
@@ -165,13 +165,13 @@ func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin
 		}
 	}
 
-	objects, err := s.repo.GetAll(ctx, userID, isAdmin, objType, search)
+	objects, err := s.repo.GetAll(ctx, userID, isAdmin, objType, search, metaFilters)
 	if err != nil {
 		return nil, err
 	}
 
-	// Save to cache only when no text search
-	if s.cache != nil && search == "" {
+	// Save to cache only when no text search and no meta filters
+	if s.cache != nil && search == "" && len(metaFilters) == 0 {
 		_ = s.cache.SetList(ctx, userID, isAdmin, objType, objects)
 	}
 
@@ -189,9 +189,9 @@ func (s *GeoObjectService) GetAll(ctx context.Context, userID uuid.UUID, isAdmin
 }
 
 // GetInBBox retrieves geo objects within a bounding box
-func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string) (*dto.GeoObjectListResponse, error) {
-	// Skip cache when text search is active
-	if s.cache != nil && search == "" {
+func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAdmin bool, objType string, minLat, minLng, maxLat, maxLng float64, zoom int, clip bool, filterByZoom bool, search string, metaFilters map[string]string) (*dto.GeoObjectListResponse, error) {
+	// Skip cache when text search or meta filters are active
+	if s.cache != nil && search == "" && len(metaFilters) == 0 {
 		cachedObjects, err := s.cache.GetBBox(ctx, zoom, minLat, minLng, maxLat, maxLng, objType, filterByZoom)
 		if err == nil && cachedObjects != nil {
 			responses := make([]dto.GeoObjectResponse, len(cachedObjects))
@@ -205,13 +205,13 @@ func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAd
 		}
 	}
 
-	objects, err := s.repo.GetByBBox(ctx, userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search)
+	objects, err := s.repo.GetByBBox(ctx, userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search, metaFilters)
 	if err != nil {
 		return nil, err
 	}
 
-	// Save to bbox cache only when no text search
-	if s.cache != nil && search == "" {
+	// Save to bbox cache only when no text search and no meta filters
+	if s.cache != nil && search == "" && len(metaFilters) == 0 {
 		_ = s.cache.SetBBox(ctx, zoom, minLat, minLng, maxLat, maxLng, objType, filterByZoom, objects)
 	}
 

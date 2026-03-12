@@ -119,6 +119,14 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 	maxLngStr := c.Query("maxLng")
 	zoomStr := c.Query("zoom")
 
+	// Collect metadata filters (params starting with meta_)
+	metaFilters := make(map[string]string)
+	for k, v := range c.Request.URL.Query() {
+		if len(k) > 5 && k[:5] == "meta_" {
+			metaFilters[k[5:]] = v[0]
+		}
+	}
+
 	var resp *dto.GeoObjectListResponse
 	var err error
 
@@ -134,9 +142,9 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 		clip := c.Query("clip") == "true"
 		filterByZoom := c.Query("filterByZoom") != "false" // default true
 
-		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search)
+		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search, metaFilters)
 	} else {
-		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType, search)
+		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType, search, metaFilters)
 	}
 
 	if err != nil {

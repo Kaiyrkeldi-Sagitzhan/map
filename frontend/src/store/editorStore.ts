@@ -78,6 +78,9 @@ interface EditorState {
     setSearchResults: (results: EditorFeature[]) => void
     clearSearchResults: () => void
 
+    // Feature Metadata
+    updateFeatureMetadata: (id: string, key: string, value: any) => void
+
     // Layer management
     toggleLayerVisibility: (layerId: string) => void
     toggleLayerLock: (layerId: string) => void
@@ -259,6 +262,15 @@ export const useEditorStore = create<EditorState>()(
             
             setSearchResults: (results) => set({ searchResults: results }),
             clearSearchResults: () => set({ searchResults: [] }),
+
+            // ─── Feature Metadata ────────────────────────────────────
+            updateFeatureMetadata: (id, key, value) => {
+                const f = get().features.find((f) => f.id === id)
+                if (!f) return
+                const metadata = f.metadata || {}
+                const updatedMetadata = { ...metadata, [key]: value }
+                get().updateFeature(id, { metadata: updatedMetadata })
+            },
 
             // ─── Layer management ────────────────────────────────────
             toggleLayerVisibility: (lid) => {

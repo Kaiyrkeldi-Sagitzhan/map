@@ -161,10 +161,9 @@ export function useGeoman() {
 
     // ─── Edit/History tool: click to pick object ─────────────
     const pickObjectAt = useCallback(async (latlng: L.LatLng) => {
-        console.log('[pickObjectAt] called at', latlng.lat, latlng.lng)
+        console.log('[pickObjectAt] called at', latlng.lat, latlng.lng, 'filter by:', featureClass)
         setLoading(true)
         const zoom = map.getZoom()
-        // Radius for picking: at high zoom (20) it's small, at low zoom it's larger
         const delta = Math.max(0.0001, 2.0 / Math.pow(2, zoom))
         const bbox = {
             minLat: latlng.lat - delta,
@@ -172,28 +171,22 @@ export function useGeoman() {
             maxLat: latlng.lat + delta,
             maxLng: latlng.lng + delta,
             zoom,
-            filterByZoom: false, // CRITICAL: ignore zoom filters when picking for edit
+            filterByZoom: false,
         }
 
         try {
-            const res = await apiService.getGeoObjects('', bbox)
+            // Contextual filtering: if a specific class is selected (not 'custom'/'other'), use it as a filter
+            let typeFilter = ''
+            if (featureClass !== 'custom' && featureClass !== 'other') {
+                // Map local 'lake' to OSM 'water' for better API results if necessary
+                typeFilter = featureClass === 'lake' ? 'water' : featureClass
+            }
+
+            const res = await apiService.getGeoObjects(typeFilter, bbox)
             console.log('[pickObjectAt] API returned', res.objects?.length, 'objects')
             if (res.objects && res.objects.length > 0) {
-                // Find best object: prioritize by type (buildings/roads first)
-                const priority: Record<string, number> = {
-                    'building': 10,
-                    'road': 9,
-                    'river': 8,
-                    'forest': 5,
-                    'lake': 4,
-                    'city': 3,
-                }
-                const sorted = [...res.objects].sort((a, b) => 
-                    (priority[b.type] || 0) - (priority[a.type] || 0)
-                )
-
-                const obj = sorted[0]
-                console.log('[pickObjectAt] picked object:', obj.name, 'id:', obj.id)
+                const obj = res.objects[0]
+                console.log('[pickObjectAt] picked object:', obj.name, 'type:', obj.type)
                 
                 // Check if already in features list by backendId
                 const existing = useEditorStore.getState().features.find(
