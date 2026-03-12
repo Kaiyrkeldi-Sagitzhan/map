@@ -87,24 +87,25 @@ const MapEditor = () => {
     const mapOpacity = useEditorStore((s) => s.mapOpacity)
 
     return (
-        <div className="flex h-full w-full overflow-hidden bg-gray-50 text-gray-900 font-sans">
+        <div className="flex h-full w-full overflow-hidden bg-[#020C1B] text-white font-sans">
             {/* Left Sidebar: Layers */}
             <LayersPanel />
 
             {/* Center: Map Area */}
-            <main className={`relative flex-1 ${!showMap ? 'bg-[#fcfcfc]' : 'bg-white'}`}>
+            <main className="relative flex-1 bg-[#020C1B]">
                 <MapContainer
-                    center={[30.0, 66.9237]} // Slightly south for a "coming from below" feel
+                    center={[30.0, 66.9237]}
                     zoom={3}
-                    className="h-full w-full outline-none bg-[#f2efe9]"
+                    className="h-full w-full outline-none"
+                    style={{ background: '#020C1B' }}
                     zoomControl={false}
                     minZoom={3}
-                    maxZoom={20}
+                    maxZoom={18}
                     preferCanvas={true}
                 >
                     <MapStateTracker />
                     <TileLayer
-                        url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                        url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
                         opacity={showMap ? mapOpacity : 0}
                     />

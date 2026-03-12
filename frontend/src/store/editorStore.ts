@@ -15,6 +15,8 @@ import type {
     ClassStyle,
 } from '../types/editor'
 import { CLASS_STYLES } from '../types/editor'
+import { apiService } from '../services/api'
+import type { GeoObjectHistory } from '../types'
 
 // ─── Store Interface ───────────────────────────────────────
 interface EditorState {
@@ -44,6 +46,7 @@ interface EditorState {
     mapOpacity: number
     isLoading: boolean
     editHistory: EditHistoryEntry[]
+    serverHistory: GeoObjectHistory[]
     isGeometryDirty: boolean
 
     // ─── Actions ─────────────────────────────────────────────
@@ -59,6 +62,8 @@ interface EditorState {
     deleteEditHistoryEntry: (id: string) => void
     getFeatureHistory: (featureId: string) => EditHistoryEntry[]
     clearEditHistory: () => void
+    fetchFeatureHistory: (id: string) => Promise<void>
+    rollbackToHistory: (historyId: string) => Promise<void>
 
     // Feature CRUD
     addFeature: (feature: EditorFeature) => void
@@ -119,6 +124,7 @@ export const useEditorStore = create<EditorState>()(
             mapOpacity: 1.0,
             isLoading: false,
             editHistory: [],
+            serverHistory: [],
             isGeometryDirty: false,
             // ─── Tool / Class ────────────────────────────────────────
             setTool: (tool) => set({ currentTool: tool }),
@@ -140,6 +146,31 @@ export const useEditorStore = create<EditorState>()(
                 return get().editHistory.filter((e) => e.featureId === featureId)
             },
             clearEditHistory: () => set({ editHistory: [] }),
+
+            fetchFeatureHistory: async (id) => {
+                try {
+                    const history = await apiService.getGeoObjectHistory(id)
+                    set({ serverHistory: history })
+                } catch (err) {
+                    console.error('[editorStore] Failed to fetch feature history:', err)
+                }
+            },
+
+            rollbackToHistory: async (historyId) => {
+                try {
+                    set({ isLoading: true })
+                    await apiService.rollbackToHistory(historyId)
+                    // After rollback, we should refresh the features
+                    // This is usually handled by the parent component or a websocket
+                    // For now, we'll just log success
+                    console.log('[editorStore] Rollback successful')
+                } catch (err) {
+                    console.error('[editorStore] Failed to rollback to history:', err)
+                    throw err
+                } finally {
+                    set({ isLoading: false })
+                }
+            },
 
             // ─── Feature CRUD ────────────────────────────────────────
             addFeature: (feature) => {

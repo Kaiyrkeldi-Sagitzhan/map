@@ -450,8 +450,8 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Map */}
-      <div className="flex-1 relative">
+      {/* Map Container */}
+      <div className="flex-1 relative bg-[#020C1B]">
         <MapContainer
           center={[48.0196, 66.9237]}
           zoom={5}
@@ -459,10 +459,11 @@ export default function MapView() {
           zoomControl={false}
           attributionControl={false}
           minZoom={3}
+          maxZoom={20}
           maxBoundsViscosity={focusKZ ? 1.0 : 0}
         >
           <TileLayer
-            url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
 
           {/* Kazakhstan boundary - only visible in focus mode */}
@@ -487,8 +488,8 @@ export default function MapView() {
               data={worldMaskGeoJSON}
               style={{
                 color: 'transparent',
-                fillColor: '#ffffff',
-                fillOpacity: 0.92,
+                fillColor: '#020C1B',
+                fillOpacity: 0.95,
                 weight: 0,
               }}
             />

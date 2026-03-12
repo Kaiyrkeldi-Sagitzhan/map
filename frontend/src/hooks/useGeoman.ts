@@ -48,6 +48,7 @@ export function useGeoman() {
         setSelectedFeature,
         setMouseCoords,
         setLoading,
+        setGeometryDirty,
     } = useEditorStore()
 
     const searchLayers = useRef<L.Layer[]>([])
@@ -192,19 +193,21 @@ export function useGeoman() {
                 )
 
                 const obj = sorted[0]
-                console.log('[pickObjectAt] picked object:', obj.name, 'type:', obj.type)
+                console.log('[pickObjectAt] picked object:', obj.name, 'id:', obj.id)
                 
-                // Check if already in features list
+                // Check if already in features list by backendId
                 const existing = useEditorStore.getState().features.find(
-                    (f) => f.backendId === obj.id
+                    (f) => f.backendId === obj.id || f.id === obj.id
                 )
                 
                 let targetFid: string
                 if (existing) {
                     targetFid = existing.id
                 } else {
+                    // CRITICAL: Use the real ID from database as the local ID
+                    // This ensures stability for history and sync
                     const newFeature: EditorFeature = {
-                        id: crypto.randomUUID(),
+                        id: obj.id, 
                         name: obj.name || 'Объект',
                         featureClass: (obj.type || 'custom') as any,
                         description: obj.description || '',
@@ -375,8 +378,9 @@ export function useGeoman() {
 
         // Mark as geoman-originated so the sync effect skips re-applying to this layer
         geomanEditedIds.current.add(fid)
+        setGeometryDirty(true)
         updateFeature(fid, { geometry: geoJson.geometry })
-    }, [updateFeature])
+    }, [updateFeature, setGeometryDirty])
 
     const handleRemove = useCallback((e: any) => {
         const layer = e.layer as L.Layer
@@ -546,6 +550,20 @@ export function useGeoman() {
             })
         }
     }, [map, currentTool, selectedFeatureId])
+
+    // ─── Map Refresh Event ──────────────────────────────────
+    useEffect(() => {
+        const handleRefresh = () => {
+            console.log('[useGeoman] Map refresh triggered')
+            // This forces the sync effect to run by clearing and re-setting IDs
+            lastSyncedGeometry.current.clear()
+            geomanEditedIds.current.clear()
+            // We need to trigger a re-render of the sync effect
+            updateFeature('', {}) // dummy update to trigger effect
+        }
+        window.addEventListener('refresh-map', handleRefresh)
+        return () => window.removeEventListener('refresh-map', handleRefresh)
+    }, [updateFeature])
 
     return { layerToFeatureId, featureIdToLayer }
 }

@@ -25,13 +25,14 @@ var (
 
 // GeoObjectService handles geo object business logic
 type GeoObjectService struct {
-	repo  *repository.GeoObjectRepository
-	cache *repository.RedisCache
+	repo        *repository.GeoObjectRepository
+	historyRepo *repository.GeoObjectHistoryRepository
+	cache       *repository.RedisCache
 }
 
 // NewGeoObjectService creates a new GeoObjectService instance
-func NewGeoObjectService(repo *repository.GeoObjectRepository, cache *repository.RedisCache) *GeoObjectService {
-	return &GeoObjectService{repo: repo, cache: cache}
+func NewGeoObjectService(repo *repository.GeoObjectRepository, historyRepo *repository.GeoObjectHistoryRepository, cache *repository.RedisCache) *GeoObjectService {
+	return &GeoObjectService{repo: repo, historyRepo: historyRepo, cache: cache}
 }
 
 // Create creates a new geo object
@@ -87,6 +88,26 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 	err = s.repo.Create(ctx, obj)
 	if err != nil {
 		return nil, err
+	}
+
+	// Record "create" history
+	if s.historyRepo != nil {
+		created, _ := s.repo.GetByID(ctx, obj.ID)
+		if created != nil {
+			afterSnap := buildSnapshot(created)
+			historyEntry := &model.GeoObjectHistory{
+				ID:            uuid.New(),
+				ObjectID:      obj.ID,
+				UserID:        userID,
+				Action:        "create",
+				Description:   fmt.Sprintf("Создан объект \"%s\"", obj.Name),
+				AfterSnapshot: afterSnap,
+				CreatedAt:     now,
+			}
+			if err := s.historyRepo.Create(ctx, historyEntry); err != nil {
+				log.Printf("[WARN] Failed to record create history for object %s: %v", obj.ID, err)
+			}
+		}
 	}
 
 	// Invalidate cache
@@ -209,15 +230,18 @@ func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAd
 func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool, req *dto.UpdateGeoObjectRequest) (*dto.GeoObjectResponse, error) {
 	// Get existing object
 	existing, err := s.repo.GetByID(ctx, id)
+	isNew := false
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
-			return nil, ErrObjectNotFound
+			// If not found, we'll create it (Upsert logic for imported data)
+			isNew = true
+		} else {
+			return nil, err
 		}
-		return nil, err
 	}
 
-	// Check ownership/admin
-	if !s.canModify(existing, userID, isAdmin) {
+	// Check ownership/admin (only for existing objects)
+	if !isNew && !s.canModify(existing, userID, isAdmin) {
 		return nil, ErrAccessDenied
 	}
 
@@ -244,56 +268,111 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 
 	// Update fields
 	now := time.Now()
-	obj := &model.GeoObject{
-		ID:          id,
-		OwnerID:     existing.OwnerID,
-		Scope:       existing.Scope,
-		Type:        existing.Type,
-		Name:        existing.Name,
-		Description: existing.Description,
-		Metadata:    existing.Metadata,
-		Geometry:    existing.Geometry,
-		UpdatedAt:   now,
-	}
+	var obj *model.GeoObject
 
-	// Apply updates
-	if req.Scope != "" {
-		obj.Scope = req.Scope
-	}
-	if req.Type != "" {
-		obj.Type = req.Type
-	}
-	if req.Name != "" {
-		obj.Name = req.Name
-	}
-	if req.Description != "" {
-		obj.Description = req.Description
-	}
-	if req.Metadata != nil {
-		obj.Metadata = req.Metadata
-	}
-	if len(req.Geometry) > 0 {
-		obj.Geometry = req.Geometry
-	}
-
-	// Determine owner_id based on scope change
-	if req.Scope != "" && req.Scope != existing.Scope {
-		if obj.Scope == model.ScopePrivate {
-			obj.OwnerID = &userID
-		} else if obj.Scope == model.ScopeGlobal {
-			obj.OwnerID = nil
+	if isNew {
+		// Prepare new object from request
+		var ownerID *uuid.UUID
+		scope := req.Scope
+		if scope == "" {
+			scope = model.ScopeGlobal
 		}
+		
+		if scope == model.ScopePrivate {
+			ownerID = &userID
+		}
+
+		obj = &model.GeoObject{
+			ID:          id,
+			OwnerID:     ownerID,
+			Scope:       scope,
+			Type:        req.Type,
+			Name:        req.Name,
+			Description: req.Description,
+			Metadata:    req.Metadata,
+			Geometry:    req.Geometry,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		
+		// Ensure basic fields aren't empty for new object
+		if obj.Type == "" { obj.Type = "custom" }
+		if obj.Name == "" { obj.Name = "Imported Object" }
+		
+		err = s.repo.Create(ctx, obj)
+	} else {
+		// Update existing object
+		obj = &model.GeoObject{
+			ID:          id,
+			OwnerID:     existing.OwnerID,
+			Scope:       existing.Scope,
+			Type:        existing.Type,
+			Name:        existing.Name,
+			Description: existing.Description,
+			Metadata:    existing.Metadata,
+			Geometry:    existing.Geometry,
+			UpdatedAt:   now,
+		}
+
+		// Apply updates
+		if req.Scope != "" {
+			obj.Scope = req.Scope
+		}
+		if req.Type != "" {
+			obj.Type = req.Type
+		}
+		if req.Name != "" {
+			obj.Name = req.Name
+		}
+		if req.Description != "" {
+			obj.Description = req.Description
+		}
+		if req.Metadata != nil {
+			obj.Metadata = req.Metadata
+		}
+		if len(req.Geometry) > 0 {
+			obj.Geometry = req.Geometry
+		}
+
+		// Determine owner_id based on scope change
+		if req.Scope != "" && req.Scope != existing.Scope {
+			if obj.Scope == model.ScopePrivate {
+				obj.OwnerID = &userID
+			} else if obj.Scope == model.ScopeGlobal {
+				obj.OwnerID = nil
+			}
+		}
+
+		err = s.repo.Update(ctx, obj)
 	}
 
-	err = s.repo.Update(ctx, obj)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get updated object
+	// Get updated/created object
 	updated, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Record history for updates on existing objects
+	if !isNew && s.historyRepo != nil {
+		beforeSnap := buildSnapshot(existing)
+		afterSnap := buildSnapshot(updated)
+		historyEntry := &model.GeoObjectHistory{
+			ID:             uuid.New(),
+			ObjectID:       id,
+			UserID:         userID,
+			Action:         "update",
+			Description:    fmt.Sprintf("Изменён объект \"%s\"", updated.Name),
+			BeforeSnapshot: beforeSnap,
+			AfterSnapshot:  afterSnap,
+			CreatedAt:      now,
+		}
+		if err := s.historyRepo.Create(ctx, historyEntry); err != nil {
+			log.Printf("[WARN] Failed to record history for object %s: %v", id, err)
+		}
 	}
 
 	// Invalidate cache
@@ -351,6 +430,21 @@ func (s *GeoObjectService) canModify(obj *model.GeoObjectWithGeometry, userID uu
 		return true
 	}
 	return false
+}
+
+// buildSnapshot creates a JSON snapshot of a geo object for history storage
+func buildSnapshot(obj *model.GeoObjectWithGeometry) json.RawMessage {
+	snap := map[string]interface{}{
+		"owner_id":    obj.OwnerID,
+		"scope":       obj.Scope,
+		"type":        obj.Type,
+		"name":        obj.Name,
+		"description": obj.Description,
+		"metadata":    obj.Metadata,
+		"geometry":    obj.Geometry,
+	}
+	data, _ := json.Marshal(snap)
+	return data
 }
 
 // toResponse converts model to DTO

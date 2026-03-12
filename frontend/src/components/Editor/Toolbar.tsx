@@ -162,9 +162,9 @@ export default function Toolbar() {
     }, [setTool])
 
     return (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1">
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1">
             {/* Main toolbar pill */}
-            <div className="flex items-center gap-0.5 bg-white rounded-full shadow-2xl shadow-black/20 border border-gray-200/60 px-2 py-1.5">
+            <div className="flex items-center gap-1 bg-[#020C1B]/60 backdrop-blur-3xl rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 px-3 py-2">
                 {tools.map((tool) => (
                     <button
                         key={tool.id}
@@ -172,28 +172,25 @@ export default function Toolbar() {
                         title={tool.label}
                         className={`
               relative flex items-center justify-center w-10 h-10 rounded-full
-              transition-all duration-200 ease-out
+              transition-all duration-300 ease-out
               ${currentTool === tool.id
-                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-110'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                ? 'bg-[#10B981] text-[#020C1B] shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-110'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }
             `}
                     >
                         {tool.icon}
-                        {currentTool === tool.id && (
-                            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full" />
-                        )}
                     </button>
                 ))}
 
                 {/* Divider */}
-                <div className="w-px h-8 bg-gray-200 mx-1.5" />
+                <div className="w-px h-6 bg-white/10 mx-2" />
 
                 <button
                     onClick={() => setShowMap(!showMap)}
                     title={showMap ? "Скрыть подложку" : "Показать подложку"}
-                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-                        showMap ? 'text-gray-600 hover:bg-gray-100' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 ${
+                        showMap ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-[#10B981] bg-[#10B981]/10 border border-[#10B981]/20'
                     }`}
                 >
                     {showMap ? (
@@ -215,7 +212,7 @@ export default function Toolbar() {
                         }
                     }}
                     title="Очистить карту"
-                    className="flex items-center justify-center w-10 h-10 rounded-full text-red-500 hover:bg-red-50 transition-colors"
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 6h18" />
@@ -225,34 +222,34 @@ export default function Toolbar() {
                 </button>
 
                 {/* Divider */}
-                <div className="w-px h-8 bg-gray-200 mx-1.5" />
+                <div className="w-px h-6 bg-white/10 mx-2" />
 
                 {/* Class dropdown */}
                 <div className="relative" ref={classMenuRef}>
                     <button
                         onClick={() => setShowClassMenu(!showClassMenu)}
                         className={`
-              flex items-center gap-2 px-3 py-2 rounded-full
-              text-sm font-medium transition-all duration-200
+              flex items-center gap-3 px-4 py-2 rounded-full
+              text-xs font-bold uppercase tracking-widest transition-all duration-300
               ${showClassMenu
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                ? 'bg-white/10 text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
                             }
             `}
                     >
                         <span
-                            className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
+                            className="w-3 h-3 rounded-full border border-white/20 shadow-sm"
                             style={{ backgroundColor: CLASS_STYLES[featureClass].fillColor }}
                         />
                         <span>{CLASS_LABELS[featureClass]}</span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                             <polyline points="6 9 12 15 18 9" />
                         </svg>
                     </button>
 
                     {/* Dropdown menu */}
                     {showClassMenu && (
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl shadow-black/15 border border-gray-200/60 py-2 min-w-[180px]">
+                        <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 bg-[#0A192F]/90 backdrop-blur-2xl rounded-[20px] shadow-2xl border border-white/10 py-3 min-w-[200px]">
                             {featureClasses.map((fc) => (
                                 <button
                                     key={fc}
@@ -261,19 +258,18 @@ export default function Toolbar() {
                                         setShowClassMenu(false)
                                     }}
                                     className={`
-                    w-full flex items-center gap-3 px-4 py-2.5 text-sm
-                    transition-colors duration-150
+                    w-full flex items-center gap-4 px-5 py-3 text-xs font-bold uppercase tracking-widest
+                    transition-all duration-200
                     ${featureClass === fc
-                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                            : 'text-gray-700 hover:bg-gray-50'
+                                            ? 'bg-[#10B981]/10 text-[#10B981]'
+                                            : 'text-slate-400 hover:text-white hover:bg-white/5'
                                         }
                   `}
                                 >
                                     <span
-                                        className="w-4 h-4 rounded-full border-2 shadow-sm"
+                                        className="w-3 h-3 rounded-full border border-white/10 shadow-sm"
                                         style={{
                                             backgroundColor: CLASS_STYLES[fc].fillColor,
-                                            borderColor: CLASS_STYLES[fc].color,
                                         }}
                                     />
                                     <span>{CLASS_LABELS[fc]}</span>

@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setIsAdmin(false)
     setIsAuthenticated(false)
-    navigate('/login')
+    navigate('/')
   }
 
   return (

@@ -79,6 +79,18 @@ export interface LayerVisibility {
   other: boolean;
 }
 
+// History types
+export interface GeoObjectHistory {
+  id: string;
+  objectId: string;
+  userId: string;
+  action: 'create' | 'update' | 'delete';
+  description: string;
+  beforeSnapshot?: any;
+  afterSnapshot?: any;
+  createdAt: string;
+}
+
 // Auth context types
 export interface AuthContextType {
   user: User | null;

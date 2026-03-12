@@ -51,16 +51,19 @@ func main() {
 
 	// Initialize repository
 	geoObjectRepository := repository.NewGeoObjectRepository(db)
+	geoObjectHistoryRepository := repository.NewGeoObjectHistoryRepository(db)
 
 	// Initialize Redis cache
 	redisCache := repository.NewRedisCache(cfg.RedisURL)
 	defer redisCache.Close()
 
 	// Initialize service
-	geoObjectService := service.NewGeoObjectService(geoObjectRepository, redisCache)
+	geoObjectService := service.NewGeoObjectService(geoObjectRepository, geoObjectHistoryRepository, redisCache)
+	geoObjectHistoryService := service.NewGeoObjectHistoryService(geoObjectHistoryRepository, geoObjectRepository)
 
 	// Initialize handler
 	geoObjectHandler := handler.NewGeoObjectHandler(geoObjectService)
+	geoObjectHistoryHandler := handler.NewGeoObjectHistoryHandler(geoObjectHistoryService)
 
 	// Setup Gin router
 	router := gin.Default()
@@ -83,6 +86,10 @@ func main() {
 			mapGroup.PUT("/objects/:id", geoObjectHandler.Update)
 			mapGroup.DELETE("/objects/:id", geoObjectHandler.Delete)
 			mapGroup.GET("/tiles/:z/:x/:y.pbf", geoObjectHandler.GetTile)
+
+			// History routes
+			mapGroup.GET("/objects/:id/history", geoObjectHistoryHandler.GetByObjectID)
+			mapGroup.POST("/history/:historyId/rollback", geoObjectHistoryHandler.Rollback)
 		}
 	}
 

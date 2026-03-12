@@ -47,7 +47,7 @@ class ApiService {
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          window.location.href = '/';
         }
         return Promise.reject(error);
       }
@@ -110,6 +110,18 @@ class ApiService {
 
   async deleteGeoObject(id: string): Promise<void> {
     await this.mapClient.delete(`/api/map/objects/${id}`);
+  }
+
+  async getGeoObjectHistory(id: string, limit = 50): Promise<any[]> {
+    const response = await this.mapClient.get<any[]>(`/api/map/objects/${id}/history`, {
+      params: { limit }
+    });
+    return response.data;
+  }
+
+  async rollbackToHistory(historyId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.mapClient.post<{ success: boolean; message: string }>(`/api/map/history/${historyId}/rollback`);
+    return response.data;
   }
 
   getTileUrl(): string {

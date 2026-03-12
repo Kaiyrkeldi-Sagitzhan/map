@@ -3,7 +3,6 @@ import { useEditorStore } from '../../store/editorStore'
 import { getSafeStyle, getSafeLabel } from '../../types/editor'
 import type { EditHistoryEntry, EditorFeature } from '../../types/editor'
 import { Download, Layers, Clock } from 'lucide-react'
-import { apiService } from '../../services/api'
 
 const ACTION_LABELS: Record<EditHistoryEntry['action'], { label: string; color: string }> = {
     create: { label: 'Создание', color: 'bg-green-500' },
@@ -17,20 +16,20 @@ export default function LayersPanel() {
         features,
         selectedFeatureId,
         currentTool,
-        editHistory,
+        serverHistory,
         setSelectedFeature,
         toggleLayerExpand,
         toggleFeatureVisibility,
         toggleFeatureLock,
         silentUpdateFeature,
-        deleteEditHistoryEntry,
+        fetchFeatureHistory,
+        rollbackToHistory,
         mapOpacity,
         setMapOpacity,
     } = useEditorStore()
 
     const [activeTab, setActiveTab] = useState<'layers' | 'history'>('layers')
-    const [rollbackPopup, setRollbackPopup] = useState<EditHistoryEntry | null>(null)
-    // Store snapshot of current feature before preview so we can restore
+    const [rollbackPopup, setRollbackPopup] = useState<any | null>(null)
     const previewRestore = useRef<EditorFeature | null>(null)
 
     // Auto-switch to history tab when history tool is active
@@ -38,154 +37,86 @@ export default function LayersPanel() {
         if (currentTool === 'history') setActiveTab('history')
     }, [currentTool])
 
-    // Only show history for the selected feature
-    const displayHistory = selectedFeatureId
-        ? editHistory.filter((e) => e.featureId === selectedFeatureId)
-        : []
+    // Fetch history when selected feature changes (only on selection change, not on every feature update)
+    useEffect(() => {
+        if (selectedFeatureId) {
+            const state = useEditorStore.getState()
+            const feat = state.features.find(f => f.id === selectedFeatureId)
+            const backendId = feat?.backendId || selectedFeatureId
+            fetchFeatureHistory(backendId)
+        }
+    }, [selectedFeatureId])
 
     // ─── Hover preview: show old state on map ─────────────────
-    const handleEntryHover = useCallback((entry: EditHistoryEntry) => {
+    const handleEntryHover = useCallback((entry: any) => {
+        const snap = entry.afterSnapshot
+        if (!snap || !selectedFeatureId) return
+        
         const store = useEditorStore.getState()
-        const current = store.features.find(f => f.id === entry.featureId)
-        
-        // If rolling back creation -> object didn't exist (hide it)
-        if (entry.action === 'create') {
-            if (!current) return
-            previewRestore.current = { ...current }
-            silentUpdateFeature(entry.featureId, { visible: false })
-            return
-        }
-
-        // If rolling back update or delete
-        if (!entry.beforeSnapshot) return
-        const snap = entry.beforeSnapshot as Partial<EditorFeature>
-        
-        if (entry.action === 'delete') {
-            // Deleted objects are hard to hover preview without adding them back
-            return 
-        }
-
+        const current = store.features.find(f => f.id === selectedFeatureId)
         if (!current) return
+
         previewRestore.current = { ...current }
-        // Apply old state visually
-        const patch: Partial<EditorFeature> = { visible: true }
-        if (snap.style) patch.style = snap.style
-        if (snap.name) patch.name = snap.name
-        if (snap.featureClass) patch.featureClass = snap.featureClass
-        if (snap.geometry) patch.geometry = snap.geometry
-        silentUpdateFeature(entry.featureId, patch)
-    }, [silentUpdateFeature])
+        
+        // Apply historical state visually
+        const patch: Partial<EditorFeature> = { 
+            visible: true,
+            name: snap.name || current.name,
+            geometry: snap.geometry || current.geometry,
+            featureClass: snap.type || current.featureClass
+        }
+        silentUpdateFeature(selectedFeatureId, patch)
+    }, [selectedFeatureId, silentUpdateFeature])
 
     const handleEntryLeave = useCallback(() => {
-        if (!previewRestore.current) return
+        if (!previewRestore.current || !selectedFeatureId) return
         const f = previewRestore.current
-        silentUpdateFeature(f.id, {
-            style: f.style,
+        silentUpdateFeature(selectedFeatureId, {
             name: f.name,
             featureClass: f.featureClass,
             geometry: f.geometry,
             visible: f.visible
         })
         previewRestore.current = null
-    }, [silentUpdateFeature])
+    }, [selectedFeatureId, silentUpdateFeature])
 
     // ─── Rollback confirm ─────────────────────────────────────
-    const handleRollback = useCallback((entry: EditHistoryEntry) => {
-        // Allow rollback for create (delete the object) and for updates/deletes with beforeSnapshot
-        if (entry.action !== 'create' && !entry.beforeSnapshot) return
-        // Restore from hover first
+    const handleRollback = useCallback((entry: any) => {
         handleEntryLeave()
         setRollbackPopup(entry)
     }, [handleEntryLeave])
 
     const confirmRollback = useCallback(async () => {
         if (!rollbackPopup) return
-        const store = useEditorStore.getState()
-        const fid = rollbackPopup.featureId
-        
-        // ─── CASE 1: Rollback Creation (Delete the object) ───
-        if (rollbackPopup.action === 'create') {
-            const current = store.features.find(f => f.id === fid)
-            if (current?.backendId) {
-                await apiService.deleteGeoObject(current.backendId).catch(console.error)
-            }
-            store.deleteFeature(fid)
-            setRollbackPopup(null)
-            return
-        }
-
-        // ─── CASE 2: Rollback Deletion (Restore the object) ───
-        if (rollbackPopup.action === 'delete') {
-            const snap = rollbackPopup.beforeSnapshot as EditorFeature
-            if (snap) {
-                const res = await apiService.createGeoObject({
-                    scope: snap.metadata?.scope || 'private',
-                    type: snap.featureClass as any,
-                    name: snap.name,
-                    description: snap.description,
-                    geometry: snap.geometry as any,
-                    metadata: { ...snap.metadata, style: snap.style }
-                })
-                store.addFeature({ ...snap, backendId: (res as any).id })
+        try {
+            await rollbackToHistory(rollbackPopup.id)
+            if (selectedFeatureId) {
+                const state = useEditorStore.getState()
+                const feat = state.features.find(f => f.id === selectedFeatureId)
+                const backendId = feat?.backendId || selectedFeatureId
+                fetchFeatureHistory(backendId)
             }
             setRollbackPopup(null)
-            return
+            // Note: In a real app, you'd trigger a map refresh here
+            window.location.reload()
+        } catch (err) {
+            alert('Ошибка при откате изменений')
         }
-
-        // ─── CASE 3: Rollback Update (Restore previous properties) ───
-        const snap = rollbackPopup.beforeSnapshot as Partial<EditorFeature>
-        const current = store.features.find(f => f.id === fid)
-        if (!current || !snap) { setRollbackPopup(null); return }
-
-        const patch: Partial<EditorFeature> = {}
-        if (snap.style) patch.style = snap.style
-        if (snap.name) patch.name = snap.name
-        if (snap.featureClass) patch.featureClass = snap.featureClass
-        if (snap.description !== undefined) patch.description = snap.description
-        if (snap.geometry) patch.geometry = snap.geometry
-
-        if (current.backendId) {
-            try {
-                await apiService.updateGeoObject(current.backendId, {
-                    name: patch.name || current.name,
-                    description: patch.description || current.description,
-                    type: (patch.featureClass || current.featureClass) as any,
-                    geometry: patch.geometry || current.geometry,
-                    metadata: { ...current.metadata, style: patch.style || current.style }
-                })
-            } catch (err) { console.error('Rollback sync failed', err) }
-        }
-
-        store.updateFeature(fid, patch)
-        store.addEditHistoryEntry({
-            id: crypto.randomUUID(),
-            featureId: fid,
-            featureName: snap.name || current.name,
-            action: 'update',
-            timestamp: Date.now(),
-            formattedDate: new Date().toLocaleString('ru-RU'),
-            user: 'user',
-            description: `Откат к версии от ${rollbackPopup.formattedDate}`,
-            beforeSnapshot: JSON.parse(JSON.stringify(current)),
-            afterSnapshot: { ...current, ...patch },
-        })
-
-        setRollbackPopup(null)
-    }, [rollbackPopup])
+    }, [rollbackPopup, selectedFeatureId, rollbackToHistory, fetchFeatureHistory])
 
     return (
-        <div className="w-[280px] min-w-[280px] h-full bg-white/80 backdrop-blur-md border-r border-gray-200/50 flex flex-col z-[500] overflow-hidden shadow-xl">
+        <div className="fixed top-24 left-6 bottom-32 w-[300px] bg-[#020C1B] border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.8)] rounded-[30px]">
             {/* Tabs */}
-            <div className="flex bg-slate-900 text-white p-1">
+            <div className="flex bg-[#0A192F] text-white p-2 border-b border-white/5">
                 <button
                     onClick={() => setActiveTab('layers')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition ${activeTab === 'layers' ? 'bg-indigo-600' : 'text-slate-400 hover:text-white'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all duration-300 ${activeTab === 'layers' ? 'bg-[#10B981] text-[#020C1B]' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
                 >
                     <Layers size={14} /> Слои
                 </button>
                 <button
                     onClick={() => setActiveTab('history')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition ${activeTab === 'history' ? 'bg-amber-500' : 'text-slate-400 hover:text-white'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all duration-300 ${activeTab === 'history' ? 'bg-[#0077FF] text-white' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
                 >
                     <Clock size={14} /> История
                 </button>
@@ -194,27 +125,27 @@ export default function LayersPanel() {
             {activeTab === 'layers' ? (
                 <>
                     {/* Map Opacity Control */}
-                    <div className="px-4 py-3 border-b border-gray-100/50 bg-gray-50/30">
-                        <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Прозрачность</span>
-                            <span className="text-[10px] font-bold text-indigo-600">{Math.round(mapOpacity * 100)}%</span>
+                    <div className="px-6 py-5 border-b border-white/5 bg-white/2">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Прозрачность карты</span>
+                            <span className="text-[10px] font-bold text-[#10B981]">{Math.round(mapOpacity * 100)}%</span>
                         </div>
-                        <input type="range" min="0" max="1" step="0.01" value={mapOpacity} onChange={(e) => setMapOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                        <input type="range" min="0" max="1" step="0.01" value={mapOpacity} onChange={(e) => setMapOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#10B981]" />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto py-2">
+                    <div className="flex-1 overflow-y-auto py-4 px-2 custom-scrollbar">
                         {layers.map((layer) => {
                             const layerFeatures = features.filter(f => f.featureClass === layer.featureClass)
                             return (
-                                <div key={layer.id} className="mb-0.5">
-                                    <div className={`flex items-center gap-1.5 px-3 py-2 cursor-pointer hover:bg-gray-50 ${!layer.visible ? 'opacity-50' : ''}`} onClick={() => toggleLayerExpand(layer.id)}>
-                                        <span className={`transition-transform ${layer.expanded ? 'rotate-90' : ''}`}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6" /></svg></span>
-                                        <span className="w-2.5 h-2.5 rounded-full border border-white shadow-sm" style={{ backgroundColor: getSafeStyle(layer.featureClass).fillColor }} />
-                                        <span className="flex-1 text-xs font-bold text-gray-800 truncate">{getSafeLabel(layer.featureClass)}</span>
-                                        <span className="text-[10px] text-gray-400 font-mono">{layerFeatures.length}</span>
+                                <div key={layer.id} className="mb-1">
+                                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer hover:bg-white/5 transition-all ${!layer.visible ? 'opacity-30' : ''}`} onClick={() => toggleLayerExpand(layer.id)}>
+                                        <span className={`transition-transform duration-300 ${layer.expanded ? 'rotate-90' : ''}`}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="9 18 15 12 9 6" /></svg></span>
+                                        <span className="w-2.5 h-2.5 rounded-full border border-white/30" style={{ backgroundColor: getSafeStyle(layer.featureClass).fillColor }} />
+                                        <span className="flex-1 text-[11px] font-black text-white truncate uppercase tracking-wider">{getSafeLabel(layer.featureClass)}</span>
+                                        <span className="text-[9px] text-slate-500 font-black bg-white/5 px-2.5 py-0.5 rounded-full">{layerFeatures.length}</span>
                                     </div>
                                     {layer.expanded && (
-                                        <div className="ml-5">
+                                        <div className="mt-1 space-y-0.5">
                                             {[...layerFeatures].reverse().map((feature) => (
                                                 <FeatureItem
                                                     key={feature.id}
@@ -234,24 +165,21 @@ export default function LayersPanel() {
                 </>
             ) : (
                 /* HISTORY TAB */
-                <div className="flex-1 overflow-y-auto p-4 relative bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto p-6 relative bg-transparent custom-scrollbar">
                     {!selectedFeatureId ? (
-                        <div className="text-center py-20">
-                            <Clock size={32} className="mx-auto text-slate-300 mb-4 opacity-50" />
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Объект не выбран
-                            </p>
-                            <p className="text-[10px] text-slate-300 mt-1">Выберите объект, чтобы увидеть его историю</p>
+                        <div className="text-center py-24 px-4">
+                            <Clock size={32} className="mx-auto text-slate-700 mb-4 opacity-30" />
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Объект не выбран</p>
                         </div>
-                    ) : displayHistory.length > 0 ? (
-                        <div className="relative pl-7">
-                            {/* Timeline "Road" line */}
-                            <div className="absolute left-[10px] top-0 bottom-0 w-1.5 bg-slate-300 rounded-full" />
-
-                            <div className="space-y-6">
-                                {displayHistory.slice().reverse().map((entry) => {
-                                    const actionInfo = ACTION_LABELS[entry.action]
-                                    const canRollback = true
+                    ) : serverHistory.length > 0 ? (
+                        <div className="relative pl-6">
+                            <div className="absolute left-[8px] top-2 bottom-2 w-0.5 bg-white/5" />
+                            <div className="space-y-8">
+                                {[...serverHistory]
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map((entry, idx) => {
+                                    const actionInfo = ACTION_LABELS[entry.action] || { label: entry.action, color: 'bg-slate-600' }
+                                    const isLatest = idx === 0
                                     return (
                                         <div
                                             key={entry.id}
@@ -260,50 +188,23 @@ export default function LayersPanel() {
                                             onMouseLeave={handleEntryLeave}
                                             onClick={() => handleRollback(entry)}
                                         >
-                                            {/* Blue point on the road */}
-                                            <div className="absolute -left-[24px] top-4 w-4 h-4 rounded-full bg-blue-500 border-4 border-white shadow-md z-10 transition-transform group-hover:scale-125" />
+                                            <div className={`absolute -left-[21px] top-3 w-2.5 h-2.5 rounded-full border-2 z-10 transition-all ${isLatest ? 'bg-[#10B981] border-white scale-125 shadow-[0_0_10px_#10B981]' : 'bg-slate-800 border-slate-600'}`} />
 
-                                            <div className={`bg-white p-4 rounded-2xl border-2 shadow-sm transition-all duration-300 ${canRollback ? 'border-transparent hover:border-blue-400 hover:shadow-blue-100' : 'border-transparent shadow-slate-200/50'}`}>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className={`text-[9px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-tighter ${actionInfo.color}`}>
+                                            <div className={`p-4 rounded-2xl border transition-all duration-300 ${isLatest ? 'bg-white/10 border-[#10B981]/30 shadow-lg shadow-[#10B981]/5' : 'bg-white/5 border-white/5 hover:bg-white/8 hover:border-white/10'}`}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className={`text-[8px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-widest ${actionInfo.color}`}>
                                                         {actionInfo.label}
                                                     </span>
-                                                    <span className="text-[10px] text-slate-400 font-bold">{entry.formattedDate}</span>
+                                                    <span className="text-[9px] text-slate-500 font-bold">{new Date(entry.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </div>
-                                                <p className="text-sm font-bold text-slate-800 leading-tight mb-2">{entry.description}</p>
-                                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{entry.featureName}</span>
-                                                        <span className="text-[9px] text-blue-500 font-medium">@{entry.user}</span>
-                                                    </div>
-                                                    {canRollback && (
-                                                        <div className="flex items-center gap-1 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <span className="text-[10px] font-black uppercase">Откат</span>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+                                                <p className="text-xs font-bold text-white leading-tight mb-2">{entry.description}</p>
+                                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                                                    <span className="text-[8px] text-[#10B981] uppercase font-black tracking-[0.2em]">{isLatest ? 'Текущая версия' : 'Предыдущая'}</span>
+                                                    {!isLatest && (
+                                                        <div className="text-[#10B981] opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
                                                         </div>
                                                     )}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            const isLatest = displayHistory[displayHistory.length - 1]?.id === entry.id;
-                                                            if (isLatest) {
-                                                                if (confirm('Удалить это изменение и ВЕРНУТЬ объект к предыдущему состоянию?')) {
-                                                                    handleRollback(entry);
-                                                                    deleteEditHistoryEntry(entry.id);
-                                                                }
-                                                            } else {
-                                                                if (confirm('Удалить эту запись из истории?')) {
-                                                                    deleteEditHistoryEntry(entry.id);
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        title="Удалить из истории"
-                                                    >
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                                                        </svg>
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -312,50 +213,47 @@ export default function LayersPanel() {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center py-20">
-                            <Clock size={32} className="mx-auto text-slate-300 mb-4 opacity-50" />
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                Нет записей
-                            </p>
-                            <p className="text-[10px] text-slate-300 mt-1">Начните редактирование</p>
+                        <div className="text-center py-24">
+                            <Clock size={32} className="mx-auto text-slate-700 mb-4 opacity-30" />
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">История пуста</p>
                         </div>
                     )}
                 </div>
             )}
 
-            <div className="px-4 py-3 border-t border-gray-100 bg-white">
+            <div className="px-6 py-4 border-t border-white/5 bg-white/5">
                 <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{features.length} объектов</span>
-                    <button className="p-2 bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors"><Download size={16} /></button>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{features.length} объектов</span>
+                    <button className="p-2 bg-white/5 rounded-xl text-slate-400 hover:text-[#10B981] transition-colors border border-white/5"><Download size={16} /></button>
                 </div>
             </div>
 
             {/* ─── Rollback Confirmation Popup ─────────────────── */}
             {rollbackPopup && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm mx-4 border border-gray-200">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[#0A192F] rounded-[24px] shadow-[0_30px_60px_rgba(0,0,0,0.6)] p-6 max-w-sm mx-4 border border-white/[0.08]">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                                <Clock size={20} className="text-amber-600" />
+                            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                                <Clock size={20} className="text-amber-400" />
                             </div>
                             <div>
-                                <h3 className="text-sm font-bold text-gray-900">Откатить изменения?</h3>
-                                <p className="text-xs text-gray-500">Версия от {rollbackPopup.formattedDate}</p>
+                                <h3 className="text-sm font-bold text-white">Откатить изменения?</h3>
+                                <p className="text-xs text-slate-500">Версия от {rollbackPopup.formattedDate}</p>
                             </div>
                         </div>
-                        <p className="text-xs text-gray-600 mb-5 bg-gray-50 rounded-lg p-3">
-                            Объект <strong>"{rollbackPopup.featureName}"</strong> будет возвращён к предыдущему состоянию. Текущие изменения будут записаны в историю.
+                        <p className="text-xs text-slate-400 mb-5 bg-white/5 rounded-xl p-3 border border-white/5 leading-relaxed">
+                            Объект <strong className="text-white">"{rollbackPopup.featureName}"</strong> будет возвращён к предыдущему состоянию. Текущие изменения будут записаны в историю.
                         </p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setRollbackPopup(null)}
-                                className="flex-1 px-4 py-2.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                className="flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 text-slate-400 rounded-xl transition-colors border border-white/5"
                             >
                                 Отмена
                             </button>
                             <button
                                 onClick={confirmRollback}
-                                className="flex-1 px-4 py-2.5 text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors shadow-lg shadow-amber-500/25"
+                                className="flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-[#020C1B] rounded-xl transition-colors shadow-[0_0_20px_rgba(245,158,11,0.25)]"
                             >
                                 Откатить
                             </button>
@@ -380,22 +278,22 @@ function FeatureItem({ feature, isSelected, onSelect, onToggleVisibility, onTogg
     else if (geoType.includes('Point')) geoIcon = '●'
 
     return (
-        <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer transition ${isSelected ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-gray-50 border border-transparent'}`} onClick={onSelect}>
-            <span className="text-[10px] text-gray-400" title={geoType}>{geoIcon}</span>
+        <div className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-[#10B981]/10 border border-[#10B981]/20' : 'hover:bg-white/5 border border-transparent'}`} onClick={onSelect}>
+            <span className="text-[10px] text-slate-600" title={geoType}>{geoIcon}</span>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSafeStyle(feature.featureClass).fillColor }} />
             {editing ? (
-                <input className="flex-1 text-[11px] bg-white border border-indigo-300 rounded px-1" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => { updateFeature(feature.id, { name }); setEditing(false) }} autoFocus />
+                <input className="flex-1 text-[11px] bg-white/10 border border-[#10B981]/30 rounded-lg px-1.5 py-0.5 text-white outline-none" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => { updateFeature(feature.id, { name }); setEditing(false) }} autoFocus />
             ) : (
-                <span className="flex-1 text-[11px] text-gray-700 truncate" onDoubleClick={() => setEditing(true)}>{feature.name}</span>
+                <span className="flex-1 text-[11px] text-slate-300 truncate" onDoubleClick={() => setEditing(true)}>{feature.name}</span>
             )}
-            <button onClick={(e) => { e.stopPropagation(); onToggleVisibility() }} className="text-gray-300 hover:text-gray-600" title={feature.visible ? 'Скрыть' : 'Показать'}>
+            <button onClick={(e) => { e.stopPropagation(); onToggleVisibility() }} className="text-slate-600 hover:text-slate-300 transition-colors" title={feature.visible ? 'Скрыть' : 'Показать'}>
                 {feature.visible ? (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                 ) : (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
                 )}
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onToggleLock() }} className="text-gray-300 hover:text-gray-600" title={feature.locked ? 'Разблокировать' : 'Заблокировать'}>
+            <button onClick={(e) => { e.stopPropagation(); onToggleLock() }} className="text-slate-600 hover:text-slate-300 transition-colors" title={feature.locked ? 'Разблокировать' : 'Заблокировать'}>
                 {feature.locked ? (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></svg>
                 ) : (
