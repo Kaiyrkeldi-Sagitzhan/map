@@ -14,16 +14,16 @@ export default function Layout({ children }: LayoutProps) {
       {/* Floating Header Island */}
       <header className="fixed top-4 left-1/2 -translate-x-1/2 h-[60px] flex items-center justify-between px-8 w-[96%] max-w-[1800px] z-[1000]"
         style={{
-          background: 'rgba(2, 12, 27, 0.6)',
-          backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'rgba(2, 12, 27, 0.8)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '100px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
         }}
       >
         {/* Logo: freshmap */}
-        <div className="flex items-center select-none">
+        <div className="flex items-center select-none shrink-0 relative z-10">
           <span
             className="text-[24px] font-normal tracking-wide text-[#10B981]"
             style={{ fontFamily: "'IM Fell Great Primer', serif" }}
@@ -32,8 +32,13 @@ export default function Layout({ children }: LayoutProps) {
           </span>
         </div>
 
+        {/* Absolutely Centered Search Container */}
+        <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl pointer-events-none flex justify-center">
+            <div id="header-search-portal" className="pointer-events-auto w-full flex justify-center" />
+        </div>
+
         {/* User Actions */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 shrink-0 relative z-10">
           <div className="flex items-center gap-2 text-slate-300">
             <span className="text-xs font-medium opacity-60">{user?.email}</span>
             {isAdmin && (

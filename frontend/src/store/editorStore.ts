@@ -71,6 +71,8 @@ interface EditorState {
     /** Update feature without recording edit history (for preview/rollback) */
     silentUpdateFeature: (id: string, patch: Partial<EditorFeature>) => void
     deleteFeature: (id: string) => void
+    removeFromProject: (id: string) => void
+    removeClassFromProject: (fc: FeatureClass) => void
     duplicateFeature: (id: string) => EditorFeature | null
     setFeatures: (features: EditorFeature[]) => void
     clearFeatures: () => void
@@ -238,6 +240,22 @@ export const useEditorStore = create<EditorState>()(
                 get().rebuildLayers()
             },
 
+            removeFromProject: (id) => {
+                set((s) => ({
+                    features: s.features.filter((f) => f.id !== id),
+                    selectedFeatureId: s.selectedFeatureId === id ? null : s.selectedFeatureId,
+                }))
+                get().rebuildLayers()
+            },
+
+            removeClassFromProject: (fc) => {
+                set((s) => ({
+                    features: s.features.filter((f) => f.featureClass !== fc),
+                    selectedFeatureId: s.features.find(f => f.id === s.selectedFeatureId)?.featureClass === fc ? null : s.selectedFeatureId,
+                }))
+                get().rebuildLayers()
+            },
+
             duplicateFeature: (id) => {
                 const original = get().features.find((f) => f.id === id)
                 if (!original) return null
@@ -317,6 +335,12 @@ export const useEditorStore = create<EditorState>()(
             rebuildLayers: () => {
                 const features = get().features
                 const classMap = new Map<FeatureClass, string[]>()
+                
+                // Defined classes to always show
+                const ALL_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
+                
+                ALL_CLASSES.forEach(fc => classMap.set(fc, []))
+                
                 features.forEach((f) => {
                     const ids = classMap.get(f.featureClass) || []
                     ids.push(f.id)
@@ -325,6 +349,7 @@ export const useEditorStore = create<EditorState>()(
 
                 const existingLayers = get().layers
                 const newLayers: LayerNode[] = []
+                
                 classMap.forEach((ids, fc) => {
                     const existing = existingLayers.find((l) => l.id === layerId(fc))
                     newLayers.push({
@@ -442,6 +467,11 @@ export const useEditorStore = create<EditorState>()(
                 features: state.features,
                 editHistory: state.editHistory,
             }),
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    state.rebuildLayers()
+                }
+            }
         }
     )
 )

@@ -8,7 +8,20 @@ import { getSafeLabel, getSafeStyle } from '../../types/editor'
 import type { FeatureClass, ClassStyle } from '../../types/editor'
 import { saveAs } from 'file-saver'
 import { apiService } from '../../services/api'
-import { X, Save, Box, Download } from 'lucide-react'
+import { 
+    X, 
+    Save, 
+    Box, 
+    Download, 
+    Copy, 
+    Trash2, 
+    ChevronDown, 
+    Type, 
+    Layers, 
+    Settings2, 
+    Activity,
+    CheckCircle2
+} from 'lucide-react'
 import { FEATURE_SCHEMAS } from '../../types/schema'
 
 const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
@@ -35,25 +48,16 @@ export default function PropertiesPanel() {
     const [saveFlash, setSaveFlash] = useState(false)
     const savedSnapshot = useRef<any>(null)
 
-    // Dynamic schema for the selected feature
     const schema = useMemo(() => {
         if (!feature) return null
-        
-        // Normalize fclass/type for schema lookup
         const normalize = (t: string) => {
             const low = t.toLowerCase().trim()
             if (low === 'water' || low === 'reservoir') return 'lake'
             if (low === 'peak') return 'mountain'
             return low
         }
-
-        // 1. Try metadata.fclass (specific OSM type)
         const specificFclass = feature.metadata?.fclass ? normalize(feature.metadata.fclass.toString()) : null
-        if (specificFclass && FEATURE_SCHEMAS[specificFclass]) {
-            return FEATURE_SCHEMAS[specificFclass]
-        }
-        
-        // 2. Try normalized featureClass
+        if (specificFclass && FEATURE_SCHEMAS[specificFclass]) return FEATURE_SCHEMAS[specificFclass]
         const genericClass = normalize(feature.featureClass)
         return FEATURE_SCHEMAS[genericClass] || FEATURE_SCHEMAS['other']
     }, [feature?.featureClass, feature?.metadata])
@@ -73,7 +77,6 @@ export default function PropertiesPanel() {
 
     const handleSave = async () => {
         if (!feature) return
-        
         const currentFeature = useEditorStore.getState().features.find(f => f.id === feature.id)
         if (!currentFeature) return
 
@@ -92,14 +95,9 @@ export default function PropertiesPanel() {
             setIsDirty(false)
             setGeometryDirty(false)
             setSaveFlash(true)
-            
-            // CRITICAL: Refresh history immediately
             await fetchFeatureHistory(feature.backendId || feature.id)
-
-            // Trigger map visual refresh
             window.dispatchEvent(new Event('refresh-map'))
-
-            setTimeout(() => setSaveFlash(false), 1500)
+            setTimeout(() => setSaveFlash(false), 2000)
         } catch (err) {
             console.error('Save failed:', err)
             alert('Ошибка при сохранении')
@@ -141,93 +139,117 @@ export default function PropertiesPanel() {
     }
 
     if (!feature) return (
-        <div className="fixed top-24 right-6 bottom-32 w-[320px] bg-[#020C1B] border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.8)] rounded-[30px]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
-                <h2 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Свойства объекта</h2>
+        <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
+                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Свойства объекта</h2>
             </div>
-            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-                <div className="w-20 h-20 rounded-[30px] bg-[#10B981]/5 flex items-center justify-center mb-6 border border-[#10B981]/10">
-                    <Box size={32} className="text-[#10B981]/40" />
+            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center animate-in fade-in duration-500">
+                <div className="w-20 h-20 rounded-[32px] bg-[#10B981]/5 flex items-center justify-center mb-6 border border-[#10B981]/10">
+                    <Box size={32} className="text-[#10B981]/20" />
                 </div>
-                <p className="text-sm font-bold text-white mb-2">Объект не выбран</p>
-                <p className="text-[11px] text-slate-500 italic leading-relaxed">Нажмите на элемент на карте, чтобы увидеть его параметры</p>
+                <p className="text-sm font-bold text-slate-200 mb-2">Объект не выбран</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed max-w-[180px]">Выберите элемент на карте или в списке слоев, чтобы редактировать его</p>
             </div>
         </div>
     )
 
     return (
-        <div className="fixed top-24 right-6 bottom-32 w-[320px] bg-[#020C1B] border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.8)] rounded-[30px]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
-                <h2 className="text-[9px] font-black text-[#10B981] uppercase tracking-[0.2em]">Параметры объекта</h2>
-                <button onClick={handleClose} className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-all"><X size={14} strokeWidth={3} /></button>
+        <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
+                    <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>
+                </div>
+                <button onClick={handleClose} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar px-2">
-                <div className="px-4 py-5 border-b border-white/5">
-                    <label className="text-[9px] font-black text-slate-500 mb-2 block uppercase tracking-widest ml-2">Название</label>
-                    <input className="w-full text-sm bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981] transition-all"
-                        value={name} onChange={(e) => { setName(e.target.value); markDirty() }} />
-                </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-6">
+                {/* Basic Section */}
+                <div className="space-y-4">
+                    <div className="group">
+                        <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                            <Type size={12} className="text-slate-600" /> Название
+                        </label>
+                        <input 
+                            className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#10B981]/50 focus:bg-white/[0.05] transition-all"
+                            value={name} 
+                            onChange={(e) => { setName(e.target.value); markDirty() }} 
+                            placeholder="Введите название..."
+                        />
+                    </div>
 
-                <div className="px-4 py-5 border-b border-white/5">
-                    <label className="text-[9px] font-black text-slate-500 mb-2 block uppercase tracking-widest ml-2">Классификация</label>
-                    <select value={fc} onChange={(e) => handleClassChange(e.target.value as FeatureClass)}
-                        className="w-full text-sm bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-white focus:outline-none appearance-none cursor-pointer">
-                        {featureClasses.map((c) => (<option key={c} value={c} className="bg-[#0A192F]">{getSafeLabel(c)}</option>))}
-                    </select>
-                </div>
-
-                <div className="px-4 py-5 border-b border-white/5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                            <label className="text-[8px] font-bold text-slate-500 uppercase block mb-2 text-center">Контур</label>
-                            <input type="color" value={style.color} onChange={(e) => handleStyleChange('color', e.target.value)} className="w-full h-8 rounded-lg cursor-pointer border-none bg-transparent" />
-                        </div>
-                        <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
-                            <label className="text-[8px] font-bold text-slate-500 uppercase block mb-2 text-center">Заливка</label>
-                            <input type="color" value={style.fillColor} onChange={(e) => handleStyleChange('fillColor', e.target.value)} className="w-full h-8 rounded-lg cursor-pointer border-none bg-transparent" />
+                    <div className="group">
+                        <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
+                            <Layers size={12} className="text-slate-600" /> Классификация
+                        </label>
+                        <div className="relative">
+                            <select 
+                                value={fc} 
+                                onChange={(e) => handleClassChange(e.target.value as FeatureClass)}
+                                className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none appearance-none cursor-pointer hover:bg-white/[0.05] transition-all"
+                            >
+                                {featureClasses.map((c) => (<option key={c} value={c} className="bg-[#0A192F]">{getSafeLabel(c)}</option>))}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                         </div>
                     </div>
                 </div>
 
-                <div className="px-4 py-5 border-b border-white/5 space-y-5 px-4">
-                    <div>
-                        <div className="flex justify-between items-center mb-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                            <span>Толщина линии</span> <span className="text-[#10B981]">{style.weight}px</span>
+                {/* Style Section */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                    <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                        <Settings2 size={12} className="text-slate-600" /> Оформление
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white/[0.03] p-3 rounded-xl border border-white/5 hover:bg-white/[0.05] transition-all">
+                            <label className="text-[8px] font-bold text-slate-600 uppercase block mb-2 text-center">Контур</label>
+                            <div className="flex items-center justify-center">
+                                <input type="color" value={style.color} onChange={(e) => handleStyleChange('color', e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer border-2 border-white/10 bg-transparent p-0 overflow-hidden" />
+                            </div>
                         </div>
-                        <input type="range" min="1" max="10" step="0.5" value={style.weight} onChange={(e) => handleStyleChange('weight', parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none accent-[#10B981]" />
+                        <div className="bg-white/[0.03] p-3 rounded-xl border border-white/5 hover:bg-white/[0.05] transition-all">
+                            <label className="text-[8px] font-bold text-slate-600 uppercase block mb-2 text-center">Заливка</label>
+                            <div className="flex items-center justify-center">
+                                <input type="color" value={style.fillColor} onChange={(e) => handleStyleChange('fillColor', e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer border-2 border-white/10 bg-transparent p-0 overflow-hidden" />
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                            <span>Прозрачность</span> <span className="text-[#10B981]">{Math.round(style.fillOpacity * 100)}%</span>
+
+                    <div className="space-y-4 px-1">
+                        <div>
+                            <div className="flex justify-between items-center mb-2 text-[9px] font-bold text-slate-500 uppercase">
+                                <span>Толщина линии</span> <span className="font-mono text-[#10B981]">{style.weight}px</span>
+                            </div>
+                            <input type="range" min="1" max="10" step="0.5" value={style.weight} onChange={(e) => handleStyleChange('weight', parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none accent-[#10B981]" />
                         </div>
-                        <input type="range" min="0" max="1" step="0.05" value={style.fillOpacity} onChange={(e) => handleStyleChange('fillOpacity', parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none accent-[#10B981]" />
+                        <div>
+                            <div className="flex justify-between items-center mb-2 text-[9px] font-bold text-slate-500 uppercase">
+                                <span>Прозрачность заливки</span> <span className="font-mono text-[#10B981]">{Math.round(style.fillOpacity * 100)}%</span>
+                            </div>
+                            <input type="range" min="0" max="1" step="0.05" value={style.fillOpacity} onChange={(e) => handleStyleChange('fillOpacity', parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none accent-[#10B981]" />
+                        </div>
                     </div>
                 </div>
 
-                {/* ─── Dynamic Parameters (Metadata) ─────────────────── */}
+                {/* Metadata Section */}
                 {schema && (
-                    <div className="px-4 py-5 border-b border-white/5 bg-white/[0.02]">
-                        <div className="flex items-center gap-2 mb-4 ml-2">
-                            <schema.icon size={14} className="text-[#10B981]" />
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                Доп. параметры ({schema.label})
-                            </label>
-                        </div>
-                        
-                        <div className="space-y-4">
+                    <div className="pt-4 border-t border-white/5 space-y-4">
+                        <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                            <Activity size={12} className="text-slate-600" /> Параметры {schema.label}
+                        </label>
+                        <div className="space-y-3">
                             {schema.fields.map((field) => (
-                                <div key={field.key} className="space-y-1.5 px-1">
-                                    <div className="flex items-center gap-2 text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">
+                                <div key={field.key} className="space-y-1.5">
+                                    <div className="flex items-center gap-2 text-[8px] font-bold text-slate-600 uppercase ml-1">
                                         <field.icon size={10} />
                                         <span>{field.label} {field.unit && `(${field.unit})`}</span>
                                     </div>
                                     
                                     {field.type === 'number' && (
-                                        <div className="relative flex items-center">
+                                        <div className="relative">
                                             <input 
                                                 type="number"
-                                                className="w-full text-xs bg-white/5 border border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-white focus:outline-none focus:border-[#10B981] transition-all font-mono"
+                                                className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]/50 font-mono transition-all"
                                                 placeholder="0.00"
                                                 value={feature.metadata?.[field.key] ?? ''}
                                                 onChange={(e) => {
@@ -236,14 +258,14 @@ export default function PropertiesPanel() {
                                                     markDirty()
                                                 }}
                                             />
-                                            {field.unit && <span className="absolute right-4 text-[9px] font-bold text-slate-500 uppercase">{field.unit}</span>}
+                                            {field.unit && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-600 uppercase">{field.unit}</span>}
                                         </div>
                                     )}
 
                                     {field.type === 'text' && (
                                         <input 
                                             type="text"
-                                            className="w-full text-xs bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[#10B981] transition-all"
+                                            className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]/50 transition-all"
                                             value={feature.metadata?.[field.key] || ''}
                                             onChange={(e) => {
                                                 updateFeatureMetadata(feature.id, field.key, e.target.value)
@@ -253,19 +275,22 @@ export default function PropertiesPanel() {
                                     )}
 
                                     {field.type === 'select' && (
-                                        <select 
-                                            className="w-full text-xs bg-[#0A192F] border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[#10B981] transition-all appearance-none cursor-pointer"
-                                            value={feature.metadata?.[field.key] || ''}
-                                            onChange={(e) => {
-                                                updateFeatureMetadata(feature.id, field.key, e.target.value)
-                                                markDirty()
-                                            }}
-                                        >
-                                            <option value="">Не выбрано</option>
-                                            {field.options?.map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <select 
+                                                className="w-full text-xs bg-[#0A192F] border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[#10B981]/50 appearance-none cursor-pointer transition-all"
+                                                value={feature.metadata?.[field.key] || ''}
+                                                onChange={(e) => {
+                                                    updateFeatureMetadata(feature.id, field.key, e.target.value)
+                                                    markDirty()
+                                                }}
+                                            >
+                                                <option value="">Не выбрано</option>
+                                                {field.options?.map(opt => (
+                                                    <option key={opt} value={opt}>{opt}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                                        </div>
                                     )}
 
                                     {field.type === 'toggle' && (
@@ -274,10 +299,12 @@ export default function PropertiesPanel() {
                                                 updateFeatureMetadata(feature.id, field.key, !feature.metadata?.[field.key])
                                                 markDirty()
                                             }}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${feature.metadata?.[field.key] ? 'bg-[#10B981]/20 border-[#10B981]/40 text-[#10B981]' : 'bg-white/5 border-white/10 text-slate-500'}`}
+                                            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border transition-all ${feature.metadata?.[field.key] ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-white/[0.03] border-white/10 text-slate-500'}`}
                                         >
-                                            <div className={`w-3 h-3 rounded-full transition-all ${feature.metadata?.[field.key] ? 'bg-[#10B981] shadow-[0_0_8px_#10B981]' : 'bg-slate-600'}`} />
-                                            <span className="text-[10px] font-bold uppercase">{feature.metadata?.[field.key] ? 'Вкл' : 'Выкл'}</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">{feature.metadata?.[field.key] ? 'Включено' : 'Отключено'}</span>
+                                            <div className={`w-4 h-4 rounded-full transition-all flex items-center justify-center ${feature.metadata?.[field.key] ? 'bg-emerald-500 shadow-[0_0_10px_#10B981]' : 'bg-slate-700'}`}>
+                                                {feature.metadata?.[field.key] && <CheckCircle2 size={12} className="text-[#020C1B]" />}
+                                            </div>
                                         </button>
                                     )}
                                 </div>
@@ -286,38 +313,45 @@ export default function PropertiesPanel() {
                     </div>
                 )}
 
-                <div className="px-4 py-5">
-                    <button onClick={handleSave} disabled={!isDirty && !isGeometryDirty}
-                        className={`w-full flex items-center justify-center gap-3 px-6 py-4 text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all duration-500
-                            ${saveFlash ? 'bg-[#10B981] text-[#020C1B]' : (isDirty || isGeometryDirty) ? 'bg-[#0077FF] text-white shadow-[0_0_25px_rgba(0,119,255,0.4)]' : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'}`}>
-                        {saveFlash ? <><Save size={16} strokeWidth={3} /> Сохранено</> : <><Save size={16} strokeWidth={2} /> Сохранить изменения</>}
-                    </button>
-                </div>
-
-                <div className="px-4 py-2 flex items-center gap-3">
-                    <button onClick={handleDuplicate} className="flex-1 flex items-center justify-center gap-2 py-3 text-[9px] font-black uppercase tracking-widest bg-white/5 text-slate-300 rounded-2xl border border-white/10 hover:bg-white/10 transition-all">Копия</button>
-                    <button onClick={handleDelete} className="flex-1 flex items-center justify-center gap-2 py-3 text-[9px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 rounded-2xl border border-red-500/20 hover:bg-red-500/20 transition-all">Удалить</button>
-                </div>
-
-                <div className="px-4 py-5 border-t border-white/5 mt-4">
-                    <label className="text-[9px] font-black text-slate-500 mb-3 block uppercase tracking-widest ml-2">Технические данные</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase block mb-1 text-center">Геометрия</span>
-                            <span className="text-[10px] text-white font-bold block text-center uppercase tracking-tighter">{geomInfo.type}</span>
+                {/* Info Section */}
+                <div className="pt-4 border-t border-white/5 space-y-3">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Информация</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white/[0.03] rounded-xl p-3 border border-white/5">
+                            <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Тип</span>
+                            <span className="text-[10px] text-slate-200 font-mono font-bold uppercase tracking-tight">{geomInfo.type}</span>
                         </div>
-                        <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
-                            <span className="text-[8px] font-bold text-slate-500 uppercase block mb-1 text-center">Вершины</span>
-                            <span className="text-[10px] text-white font-bold block text-center">{geomInfo.coordCount}</span>
+                        <div className="bg-white/[0.03] rounded-xl p-3 border border-white/5">
+                            <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Вершины</span>
+                            <span className="text-[10px] text-slate-200 font-mono font-bold">{geomInfo.coordCount}</span>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="px-4 py-6 mb-10">
-                    <button onClick={exportGeoJSON} className="w-full flex items-center justify-center gap-2 py-3 bg-[#10B981]/10 text-[#10B981] rounded-2xl border border-[#10B981]/20 hover:bg-[#10B981]/20 transition-all">
-                        <Download size={16} /> <span className="text-[9px] font-black uppercase tracking-widest">Экспорт GeoJSON</span>
+            {/* Actions Footer */}
+            <div className="p-4 border-t border-white/10 bg-black/20 space-y-3">
+                <button 
+                    onClick={handleSave} 
+                    disabled={!isDirty && !isGeometryDirty}
+                    className={`w-full flex items-center justify-center gap-3 px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] rounded-xl transition-all duration-300
+                        ${saveFlash ? 'bg-emerald-500 text-[#020C1B]' : (isDirty || isGeometryDirty) ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500' : 'bg-white/5 text-slate-600 cursor-not-allowed'}`}
+                >
+                    {saveFlash ? <><CheckCircle2 size={16} /> Сохранено</> : <><Save size={16} /> Сохранить</>}
+                </button>
+
+                <div className="flex gap-2">
+                    <button onClick={handleDuplicate} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/5 text-slate-400 rounded-xl border border-white/5 hover:bg-white/10 transition-all">
+                        <Copy size={14} /> Копия
+                    </button>
+                    <button onClick={handleDelete} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 hover:bg-red-500/20 transition-all">
+                        <Trash2 size={14} /> Удалить
                     </button>
                 </div>
+
+                <button onClick={exportGeoJSON} className="w-full flex items-center justify-center gap-2 py-2 text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-emerald-400 transition-all">
+                    <Download size={14} /> Экспорт GeoJSON
+                </button>
             </div>
         </div>
     )

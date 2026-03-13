@@ -87,17 +87,17 @@ const MapEditor = () => {
     const mapOpacity = useEditorStore((s) => s.mapOpacity)
 
     return (
-        <div className="flex h-full w-full overflow-hidden bg-[#020C1B] text-white font-sans">
+        <div className="flex h-full w-full overflow-hidden bg-[#010814] text-white font-sans selection:bg-[#10B981]/30">
             {/* Left Sidebar: Layers */}
             <LayersPanel />
 
             {/* Center: Map Area */}
-            <main className="relative flex-1 bg-[#020C1B]">
+            <main className="relative flex-1 bg-[#010814]">
                 <MapContainer
                     center={[30.0, 66.9237]}
                     zoom={3}
-                    className="h-full w-full outline-none"
-                    style={{ background: '#020C1B' }}
+                    className="h-full w-full outline-none z-0"
+                    style={{ background: '#010814' }}
                     zoomControl={false}
                     minZoom={3}
                     maxZoom={18}
@@ -105,7 +105,7 @@ const MapEditor = () => {
                 >
                     <MapStateTracker />
                     <TileLayer
-                        url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
                         opacity={showMap ? mapOpacity : 0}
                     />

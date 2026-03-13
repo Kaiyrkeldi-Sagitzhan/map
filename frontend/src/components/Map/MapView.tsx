@@ -451,7 +451,7 @@ export default function MapView() {
       </div>
 
       {/* Map Container */}
-      <div className="flex-1 relative bg-[#020C1B]">
+      <div className="flex-1 relative bg-slate-100">
         <MapContainer
           center={[48.0196, 66.9237]}
           zoom={5}
@@ -463,7 +463,7 @@ export default function MapView() {
           maxBoundsViscosity={focusKZ ? 1.0 : 0}
         >
           <TileLayer
-            url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
 
           {/* Kazakhstan boundary - only visible in focus mode */}
