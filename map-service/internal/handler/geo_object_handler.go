@@ -284,6 +284,5 @@ func (h *GeoObjectHandler) GetTile(c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "application/x-protobuf")
-	c.Header("Content-Encoding", "gzip")
 	c.Data(http.StatusOK, "application/x-protobuf", tile)
 }

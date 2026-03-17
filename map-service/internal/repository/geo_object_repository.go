@@ -349,19 +349,62 @@ func (r *GeoObjectRepository) GetByOwner(ctx context.Context, ownerID uuid.UUID)
 	return objects, nil
 }
 
-// GetTileMVT generates a vector tile (MVT)
+// tileTypesForZoom returns object types visible at a given zoom level for tile generation.
+// At low zooms, buildings (2.8M) and other small features are sub-pixel and skipped to save CPU.
+func tileTypesForZoom(zoom int) []string {
+	switch {
+	case zoom <= 7:
+		return []string{"lake", "river", "city"}
+	case zoom <= 9:
+		return []string{"lake", "river", "city", "forest", "road"}
+	case zoom <= 12:
+		return []string{"lake", "river", "city", "forest", "road", "other"}
+	default:
+		return nil // all types
+	}
+}
+
+// GetTileMVT generates a vector tile (MVT) with zoom-based type filtering and geometry simplification.
 func (r *GeoObjectRepository) GetTileMVT(ctx context.Context, z, x, y int) ([]byte, error) {
-	query := `
+	// Geometry expression: simplify at low zooms to reduce vertex count
+	var geomExpr string
+	switch {
+	case z <= 6:
+		geomExpr = "ST_SimplifyPreserveTopology(ST_Transform(geometry, 3857), 1000)"
+	case z <= 9:
+		geomExpr = "ST_SimplifyPreserveTopology(ST_Transform(geometry, 3857), 200)"
+	case z <= 12:
+		geomExpr = "ST_SimplifyPreserveTopology(ST_Transform(geometry, 3857), 50)"
+	default:
+		geomExpr = "ST_Transform(geometry, 3857)"
+	}
+
+	// Type filter: skip invisible objects at low zooms
+	typeFilter := ""
+	args := []interface{}{z, x, y}
+	types := tileTypesForZoom(z)
+	if types != nil {
+		placeholders := make([]string, len(types))
+		for i, t := range types {
+			args = append(args, t)
+			placeholders[i] = fmt.Sprintf("$%d", i+4)
+		}
+		typeFilter = " AND type IN (" + strings.Join(placeholders, ",") + ")"
+	}
+
+	query := fmt.Sprintf(`
 		WITH bounds AS (SELECT ST_TileEnvelope($1, $2, $3) AS geom),
 		mvt_geom AS (
-			SELECT id, name, type, metadata, ST_AsMVTGeom(ST_Transform(geometry, 3857), bounds.geom, 4096, 256, true) AS geom
+			SELECT id, name, type, metadata,
+			       ST_AsMVTGeom(%s, bounds.geom, 4096, 256, true) AS geom
 			FROM geo_objects, bounds
-			WHERE ST_Intersects(ST_Transform(geometry, 3857), bounds.geom)
+			WHERE ST_Intersects(ST_Transform(geometry, 3857), bounds.geom)%s
 		)
-		SELECT ST_AsMVT(mvt_geom.*, 'objects') FROM mvt_geom;
-	`
+		SELECT ST_AsMVT(mvt_geom.*, 'objects') FROM mvt_geom WHERE geom IS NOT NULL;
+	`, geomExpr, typeFilter)
+
 	var tile []byte
-	err := r.db.GetContext(ctx, &tile, query, z, x, y)
+	err := r.db.GetContext(ctx, &tile, query, args...)
 	return tile, err
 }
 

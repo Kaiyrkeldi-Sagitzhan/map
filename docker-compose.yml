@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgis/postgis:15-3.3
     container_name: kzmap-postgres
+    command: postgres -c shared_buffers=512MB -c work_mem=64MB -c effective_cache_size=1GB -c random_page_cost=1.1
     environment:
       POSTGRES_DB: kzmap
       POSTGRES_USER: kzmap_user
@@ -30,6 +31,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kzmap-redis
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
       - "6380:6379"
     networks:
@@ -174,6 +176,7 @@ services:
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql
         ./load_all_gpkg.sh
       else
         echo 'Database already initialized.'

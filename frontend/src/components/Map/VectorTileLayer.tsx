@@ -67,6 +67,10 @@ export default function VectorTileLayer() {
                     return baseStyle
                 }
             },
+            maxNativeZoom: 16,
+            updateWhenZooming: false,
+            updateWhenIdle: true,
+            keepBuffer: 1,
             interactive: true,
             getFeatureId: (f: any) => f.properties?.id
         }
