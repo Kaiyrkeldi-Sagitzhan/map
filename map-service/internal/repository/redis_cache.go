@@ -199,3 +199,22 @@ func (c *RedisCache) SetTile(ctx context.Context, z, x, y int, data []byte) erro
 	key := fmt.Sprintf("tile:%d:%d:%d", z, x, y)
 	return c.client.Set(ctx, key, data, 24*time.Hour).Err()
 }
+
+// GetStats retrieves cached dashboard statistics
+func (c *RedisCache) GetStats(ctx context.Context) ([]byte, error) {
+	val, err := c.client.Get(ctx, "dashboard:stats").Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	return []byte(val), err
+}
+
+// SetStats caches dashboard statistics for 1 hour
+func (c *RedisCache) SetStats(ctx context.Context, data []byte) error {
+	return c.client.Set(ctx, "dashboard:stats", data, 1*time.Hour).Err()
+}
+
+// InvalidateStats clears cached dashboard statistics
+func (c *RedisCache) InvalidateStats(ctx context.Context) error {
+	return c.client.Del(ctx, "dashboard:stats").Err()
+}

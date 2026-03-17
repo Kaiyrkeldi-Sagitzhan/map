@@ -15,7 +15,7 @@ gsap.registerPlugin(ScrollTrigger)
 /* ── Component ───────────────────────────────────────────── */
 export default function Landing() {
   const { isAuthenticated } = useAuth()
-  const [authMode, setAuthMode] = useState<'login' | 'register' | null>(null)
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'verify' | null>(null)
   const [globeSize, setGlobeSize] = useState(() =>
     Math.max(window.innerWidth, window.innerHeight) * 1.5
   )
@@ -123,7 +123,10 @@ export default function Landing() {
     return () => ScrollTrigger.getAll().forEach((t) => t.kill())
   }, [])
 
-  if (isAuthenticated) return <Navigate to="/editor" replace />
+  if (isAuthenticated) {
+    const { canEdit } = useAuth()
+    return <Navigate to={canEdit ? "/editor" : "/map"} replace />
+  }
 
   return (
     <div

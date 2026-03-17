@@ -46,6 +46,7 @@ export function useGeoman() {
         updateFeature,
         deleteFeature,
         setSelectedFeature,
+        setSelectedFeatureById,
         setMouseCoords,
         setLoading,
         setGeometryDirty,
@@ -194,6 +195,13 @@ export function useGeoman() {
             if (res.objects && res.objects.length > 0) {
                 const obj = res.objects[0]
                 
+                // NEW: In history mode, we select the object directly by its backendId
+                // without requiring it to be in the local project features.
+                if (currentTool === 'history') {
+                    await setSelectedFeatureById(obj.id)
+                    return
+                }
+
                 const existing = useEditorStore.getState().features.find(
                     (f) => f.backendId === obj.id || f.id === obj.id
                 )
@@ -528,6 +536,12 @@ export function useGeoman() {
                     lastSyncedGeometry.current.set(f.id, geoKey)
                 }
 
+                // Disable geoman on non-selected layers BEFORE setting style
+                // (pm.disable() can reset styles, so we must disable first then apply our style)
+                if ((layer as any).pm && !isSelected) {
+                    (layer as any).pm.disable()
+                }
+
                 (layer as L.Path).setStyle({
                     color: isSelected ? '#ff4500' : style.color,
                     fillColor: isLine ? 'transparent' : style.fillColor,
@@ -537,38 +551,25 @@ export function useGeoman() {
                     fill: !isLine
                 })
                 if (isSelected) (layer as L.Path).bringToFront()
-            }
-        })
-    }, [map, features, selectedFeatureId])
 
-    // ─── Sync selection and edit mode ────────────────────────
-    useEffect(() => {
-        if (!map) return
-
-        // Only disable layers that are NOT the target — avoids flash on same-layer
-        featureIdToLayer.current.forEach((layer, fid) => {
-            if ((layer as any).pm && fid !== selectedFeatureId) {
-                (layer as any).pm.disable()
+                // Enable geoman edit on selected layer in edit mode (AFTER style is set)
+                if (isSelected && currentTool === 'edit' && (layer as any).pm && !(layer as any).pm?.enabled()) {
+                    (layer as any).pm.enable({
+                        allowSelfIntersection: false,
+                        preventMarkerRemoval: false,
+                        snappable: true,
+                    })
+                }
             }
         })
 
-        if (currentTool === 'edit' && selectedFeatureId) {
-            const layer = featureIdToLayer.current.get(selectedFeatureId)
-            if (layer && !(layer as any).pm?.enabled()) {
-                console.log('[useGeoman] auto-enabling edit for', selectedFeatureId);
-                (layer as any).pm.enable({
-                    allowSelfIntersection: false,
-                    preventMarkerRemoval: false,
-                    snappable: true,
-                })
-            }
-        } else {
-            // Not in edit mode or nothing selected — disable all
+        // Disable geoman on non-feature layers (safety cleanup)
+        if (currentTool !== 'edit' || !selectedFeatureId) {
             featureIdToLayer.current.forEach((layer) => {
-                if ((layer as any).pm) (layer as any).pm.disable()
+                if ((layer as any).pm?.enabled()) (layer as any).pm.disable()
             })
         }
-    }, [map, currentTool, selectedFeatureId])
+    }, [map, features, selectedFeatureId, currentTool])
 
     // ─── Map Refresh Event ──────────────────────────────────
     useEffect(() => {

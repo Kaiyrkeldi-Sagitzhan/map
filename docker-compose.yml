@@ -56,6 +56,16 @@ services:
       DB_PASSWORD: kzmap_password
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: http://localhost:3000/auth/google/callback
+      # SMTP (for email verification)
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: noreply@freshmap.team
     ports:
       - "8081:8081"
     depends_on:
@@ -163,6 +173,7 @@ services:
         echo 'Database empty. Running migrations and import...'
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
         ./load_all_gpkg.sh
       else
         echo 'Database already initialized.'

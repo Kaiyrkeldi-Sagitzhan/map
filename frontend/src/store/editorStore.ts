@@ -53,6 +53,7 @@ interface EditorState {
     setTool: (tool: DrawTool) => void
     setFeatureClass: (fc: FeatureClass) => void
     setSelectedFeature: (id: string | null) => void
+    setSelectedFeatureById: (backendId: string) => Promise<void>
     setMouseCoords: (coords: MouseCoords | null) => void
     setShowMap: (show: boolean) => void
     setMapOpacity: (opacity: number) => void
@@ -135,6 +136,17 @@ export const useEditorStore = create<EditorState>()(
             setTool: (tool) => set({ currentTool: tool }),
             setFeatureClass: (fc) => set({ featureClass: fc }),
             setSelectedFeature: (id) => set({ selectedFeatureId: id, isGeometryDirty: false }),
+            
+            setSelectedFeatureById: async (backendId: string) => {
+                set({ isLoading: true, selectedFeatureId: backendId, isGeometryDirty: false })
+                try {
+                    // Automatically fetch history for this backend object
+                    await get().fetchFeatureHistory(backendId)
+                } finally {
+                    set({ isLoading: false })
+                }
+            },
+
             setMouseCoords: (coords) => set({ mouseCoords: coords }),
             setShowMap: (show) => set({ showMap: show }),
             setMapOpacity: (opacity) => set({ mapOpacity: opacity }),

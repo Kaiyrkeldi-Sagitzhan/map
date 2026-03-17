@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import { FeatureGroup } from 'react-leaflet'
 // @ts-ignore - react-leaflet-draw types are incompatible
@@ -107,6 +108,35 @@ function FocusControl({ focused, onToggle }: { focused: boolean; onToggle: () =>
   )
 }
 
+// Fly to coordinates from URL params (used by admin chart navigation)
+function URLParamsFlyTo({ onTypeSelect }: { onTypeSelect?: (type: ObjectType) => void }) {
+  const map = useMap()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const handled = useRef(false)
+
+  useEffect(() => {
+    if (handled.current) return
+    const lat = searchParams.get('lat')
+    const lng = searchParams.get('lng')
+    const zoom = searchParams.get('zoom')
+    const type = searchParams.get('type')
+
+    if (lat && lng) {
+      handled.current = true
+      map.flyTo([parseFloat(lat), parseFloat(lng)], zoom ? parseInt(zoom) : 10, { duration: 1.5 })
+      if (type && onTypeSelect) onTypeSelect(type as ObjectType)
+      // Clean up URL params after navigation
+      searchParams.delete('lat')
+      searchParams.delete('lng')
+      searchParams.delete('zoom')
+      searchParams.delete('type')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [map, searchParams, setSearchParams, onTypeSelect])
+
+  return null
+}
+
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -123,6 +153,8 @@ const layerColors: Record<ObjectType, string> = {
   city: '#f59e0b',
   road: '#6b7280',
   boundary: '#10b981',
+  forest: '#22c55e',
+  building: '#8b5cf6',
   other: '#6366f1',
 }
 
@@ -136,6 +168,8 @@ export default function MapView() {
     city: true,
     road: true,
     boundary: true,
+    forest: true,
+    building: true,
     other: true,
   })
   const [selectedType, setSelectedType] = useState<ObjectType>('boundary')
@@ -465,6 +499,8 @@ export default function MapView() {
           <TileLayer
             url="https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
+
+          <URLParamsFlyTo onTypeSelect={(t) => setSelectedType(t)} />
 
           {/* Kazakhstan boundary - only visible in focus mode */}
           {focusKZ && (

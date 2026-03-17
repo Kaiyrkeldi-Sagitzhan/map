@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiService } from '../services/api'
-import type { User, AuthContextType } from '../types'
+import type { User, AuthContextType, UpdateProfileRequest } from '../types'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -10,15 +10,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const [isExpert, setIsExpert] = useState<boolean>(false)
+  const [canEdit, setCanEdit] = useState<boolean>(false)
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Check if user is logged in on mount
     const storedUser = localStorage.getItem('user')
     if (storedUser && token) {
       const parsedUser = JSON.parse(storedUser)
       setUser(parsedUser)
       setIsAdmin(parsedUser.role === 'admin')
+      setIsExpert(parsedUser.role === 'expert')
+      setCanEdit(parsedUser.role === 'admin' || parsedUser.role === 'expert')
       setIsAuthenticated(true)
     }
   }, [token])
@@ -30,8 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(response.token)
     setUser(response.user)
     setIsAdmin(response.user.role === 'admin')
+    setIsExpert(response.user.role === 'expert')
+    setCanEdit(response.user.role === 'admin' || response.user.role === 'expert')
     setIsAuthenticated(true)
-    navigate('/editor')
+    // Role-based redirect
+    if (response.user.role === 'admin' || response.user.role === 'expert') {
+      navigate('/editor')
+    } else {
+      navigate('/map')
+    }
   }
 
   const register = async (email: string, password: string, role?: string) => {
@@ -41,18 +51,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(response.token)
     setUser(response.user)
     setIsAdmin(response.user.role === 'admin')
+    setIsExpert(response.user.role === 'expert')
+    setCanEdit(response.user.role === 'admin' || response.user.role === 'expert')
     setIsAuthenticated(true)
-    navigate('/editor')
+    // Role-based redirect
+    if (response.user.role === 'admin' || response.user.role === 'expert') {
+      navigate('/editor')
+    } else {
+      navigate('/map')
+    }
   }
 
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    // Also clear any impersonation data
+    sessionStorage.removeItem('admin_token')
+    sessionStorage.removeItem('admin_user')
     setToken(null)
     setUser(null)
     setIsAdmin(false)
+    setIsExpert(false)
+    setCanEdit(false)
     setIsAuthenticated(false)
     navigate('/')
+  }
+
+  const updateProfile = async (data: UpdateProfileRequest) => {
+    const updatedUser = await apiService.updateProfile(data)
+    const merged = { ...user, ...updatedUser } as User
+    setUser(merged)
+    localStorage.setItem('user', JSON.stringify(merged))
+  }
+
+  const updateUser = (newUser: User) => {
+    setUser(newUser)
+    setIsAdmin(newUser.role === 'admin')
+    setIsExpert(newUser.role === 'expert')
+    setCanEdit(newUser.role === 'admin' || newUser.role === 'expert')
+    localStorage.setItem('user', JSON.stringify(newUser))
   }
 
   return (
@@ -62,9 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isAuthenticated,
         isAdmin,
+        isExpert,
+        canEdit,
         login,
         register,
         logout,
+        updateProfile,
+        updateUser,
       }}
     >
       {children}

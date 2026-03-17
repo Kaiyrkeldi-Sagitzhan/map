@@ -6,7 +6,17 @@ import type {
   GeoObject,
   GeoObjectListResponse,
   CreateGeoObjectRequest,
-  UpdateGeoObjectRequest
+  UpdateGeoObjectRequest,
+  UpdateProfileRequest,
+  User,
+  AdminCreateUserRequest,
+  AdminUpdateUserRequest,
+  UserListResponse,
+  StatsResponse,
+  Complaint,
+  CreateComplaintRequest,
+  UpdateComplaintRequest,
+  ComplaintListResponse,
 } from '../types';
 
 const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8080';
@@ -31,30 +41,34 @@ class ApiService {
       },
     });
 
-    // Add auth interceptor to map client
-    this.mapClient.interceptors.request.use((config) => {
+    // Add auth interceptor to BOTH clients
+    const addAuthHeader = (config: any) => {
       const token = localStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       return config;
-    });
+    };
+
+    this.authClient.interceptors.request.use(addAuthHeader);
+    this.mapClient.interceptors.request.use(addAuthHeader);
 
     // Add response interceptor for error handling
-    this.mapClient.interceptors.response.use(
-      (response) => response,
-      (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/';
-        }
-        return Promise.reject(error);
+    const handleAuthError = (error: AxiosError) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
       }
-    );
+      return Promise.reject(error);
+    };
+
+    this.authClient.interceptors.response.use((r) => r, handleAuthError);
+    this.mapClient.interceptors.response.use((r) => r, handleAuthError);
   }
 
-  // Auth methods
+  // ========== Auth methods ==========
+
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await this.authClient.post<AuthResponse>('/api/auth/login', data);
     return response.data;
@@ -70,12 +84,70 @@ class ApiService {
     return response.data;
   }
 
-  async getCurrentUser(): Promise<{ id: string; email: string; role: string }> {
-    const response = await this.authClient.get('/api/auth/me');
+  async getCurrentUser(): Promise<User> {
+    const response = await this.authClient.get<User>('/api/auth/me');
     return response.data;
   }
 
-  // Geo object methods
+  async updateProfile(data: UpdateProfileRequest): Promise<User> {
+    const response = await this.authClient.put<User>('/api/auth/me', data);
+    return response.data;
+  }
+
+  // ========== Email verification ==========
+
+  async sendVerificationCode(email: string): Promise<void> {
+    await this.authClient.post('/api/auth/verify/send', { email });
+  }
+
+  async verifyCode(email: string, code: string): Promise<void> {
+    await this.authClient.post('/api/auth/verify', { email, code });
+  }
+
+  // ========== Google OAuth ==========
+
+  async getGoogleAuthURL(): Promise<{ url: string }> {
+    const response = await this.authClient.get<{ url: string }>('/api/auth/google/url');
+    return response.data;
+  }
+
+  async handleGoogleCallback(code: string): Promise<AuthResponse> {
+    const response = await this.authClient.get<AuthResponse>('/api/auth/google/callback', {
+      params: { code }
+    });
+    return response.data;
+  }
+
+  // ========== Admin user management ==========
+
+  async listUsers(search?: string, page = 1, limit = 20): Promise<UserListResponse> {
+    const params: Record<string, any> = { page, limit };
+    if (search) params.search = search;
+    const response = await this.authClient.get<UserListResponse>('/api/auth/users', { params });
+    return response.data;
+  }
+
+  async createUser(data: AdminCreateUserRequest): Promise<User> {
+    const response = await this.authClient.post<User>('/api/auth/users', data);
+    return response.data;
+  }
+
+  async updateUser(id: string, data: AdminUpdateUserRequest): Promise<User> {
+    const response = await this.authClient.put<User>(`/api/auth/users/${id}`, data);
+    return response.data;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await this.authClient.delete(`/api/auth/users/${id}`);
+  }
+
+  async impersonateUser(id: string): Promise<AuthResponse> {
+    const response = await this.authClient.post<AuthResponse>(`/api/auth/users/${id}/impersonate`);
+    return response.data;
+  }
+
+  // ========== Geo object methods ==========
+
   async getGeoObjects(type?: string, bbox?: { minLat: number, minLng: number, maxLat: number, maxLng: number, zoom?: number, clip?: boolean, filterByZoom?: boolean }, search?: string): Promise<GeoObjectListResponse> {
     const params: Record<string, any> = {};
     if (type) params.type = type;
@@ -127,6 +199,37 @@ class ApiService {
   getTileUrl(): string {
     const token = localStorage.getItem('token');
     return `${MAP_SERVICE_URL}/api/map/tiles/{z}/{x}/{y}.pbf${token ? `?token=${token}` : ''}`;
+  }
+
+  // ========== Stats ==========
+
+  async getStats(): Promise<StatsResponse> {
+    const response = await this.mapClient.get<StatsResponse>('/api/map/stats');
+    return response.data;
+  }
+
+  // ========== Complaints ==========
+
+  async createComplaint(data: CreateComplaintRequest): Promise<Complaint> {
+    const response = await this.mapClient.post<Complaint>('/api/map/complaints', data);
+    return response.data;
+  }
+
+  async listComplaints(status?: string, page = 1, limit = 20): Promise<ComplaintListResponse> {
+    const params: Record<string, any> = { page, limit };
+    if (status) params.status = status;
+    const response = await this.mapClient.get<ComplaintListResponse>('/api/map/complaints', { params });
+    return response.data;
+  }
+
+  async getComplaint(id: string): Promise<Complaint> {
+    const response = await this.mapClient.get<Complaint>(`/api/map/complaints/${id}`);
+    return response.data;
+  }
+
+  async updateComplaint(id: string, data: UpdateComplaintRequest): Promise<Complaint> {
+    const response = await this.mapClient.put<Complaint>(`/api/map/complaints/${id}`, data);
+    return response.data;
   }
 }
 

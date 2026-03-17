@@ -130,6 +130,21 @@ func IsAdmin(c *gin.Context) bool {
 	return exists && role == "admin"
 }
 
+// IsExpert checks if the user is an expert
+func IsExpert(c *gin.Context) bool {
+	role, exists := GetUserRole(c)
+	return exists && role == "expert"
+}
+
+// CanEdit checks if the user is an admin or expert
+func CanEdit(c *gin.Context) bool {
+	role, exists := GetUserRole(c)
+	if !exists {
+		return false
+	}
+	return role == "admin" || role == "expert"
+}
+
 // CORSMiddleware creates a CORS middleware
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

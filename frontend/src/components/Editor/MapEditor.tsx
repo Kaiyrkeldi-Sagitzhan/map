@@ -8,6 +8,7 @@ import { MapContainer, TileLayer, ScaleControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+import { apiService } from '../../services/api'
 import { useEditorStore } from '../../store/editorStore'
 import Toolbar from './Toolbar'
 import LayersPanel from './LayersPanel'
@@ -58,6 +59,37 @@ const MapStateTracker = () => {
                 animated.current = true
             }, 500)
         }
+    }, [map])
+
+    // Auto-select object from URL param (?objectId=xxx) — used by admin complaint navigation
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const objectId = params.get('objectId')
+        if (!objectId) return
+
+        const selectObject = async () => {
+            try {
+                const obj = await apiService.getGeoObjectById(objectId)
+                if (!obj) return
+
+                useEditorStore.getState().setSelectedFeatureById(objectId)
+                useEditorStore.getState().setTool('history')
+
+                // Fly to the object
+                const layer = L.geoJSON(
+                    { type: 'Feature', properties: {}, geometry: obj.geometry } as any
+                )
+                const bounds = layer.getBounds()
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
+                }
+            } catch (err) {
+                console.error('Failed to load object from URL:', err)
+            }
+            window.history.replaceState({}, '', window.location.pathname)
+        }
+
+        setTimeout(selectObject, 500)
     }, [map])
 
     // Save view to localStorage on every move/zoom

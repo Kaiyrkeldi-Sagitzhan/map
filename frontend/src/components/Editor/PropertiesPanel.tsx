@@ -167,8 +167,8 @@ export default function PropertiesPanel() {
                 {/* Basic Section */}
                 <div className="space-y-4">
                     <div className="group">
-                        <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                            <Type size={12} className="text-slate-600" /> Название
+                        <label className="flex items-center gap-2 text-[9px] font-bold text-white/90 uppercase tracking-widest mb-1.5 ml-1">
+                            <Type size={12} className="text-[#10B981]" /> Название
                         </label>
                         <input 
                             className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#10B981]/50 focus:bg-white/[0.05] transition-all"
@@ -179,8 +179,8 @@ export default function PropertiesPanel() {
                     </div>
 
                     <div className="group">
-                        <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                            <Layers size={12} className="text-slate-600" /> Классификация
+                        <label className="flex items-center gap-2 text-[9px] font-bold text-white/90 uppercase tracking-widest mb-1.5 ml-1">
+                            <Layers size={12} className="text-[#10B981]" /> Классификация
                         </label>
                         <div className="relative">
                             <select 
@@ -197,20 +197,20 @@ export default function PropertiesPanel() {
 
                 {/* Style Section */}
                 <div className="space-y-4 pt-4 border-t border-white/5">
-                    <label className="flex items-center gap-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">
-                        <Settings2 size={12} className="text-slate-600" /> Оформление
+                    <label className="flex items-center gap-2 text-[9px] font-bold text-white/90 uppercase tracking-widest ml-1">
+                        <Settings2 size={12} className="text-[#10B981]" /> Оформление
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="bg-white/[0.03] p-3 rounded-xl border border-white/5 hover:bg-white/[0.05] transition-all">
-                            <label className="text-[8px] font-bold text-slate-600 uppercase block mb-2 text-center">Контур</label>
+                            <label className="text-[8px] font-bold text-slate-400 uppercase block mb-2 text-center">Контур</label>
                             <div className="flex items-center justify-center">
-                                <input type="color" value={style.color} onChange={(e) => handleStyleChange('color', e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer border-2 border-white/10 bg-transparent p-0 overflow-hidden" />
+                                <input type="color" value={style.color} onChange={(e) => handleStyleChange('color', e.target.value)} className="w-10 h-10 rounded-full cursor-pointer border-2 border-white/20 bg-transparent p-0 overflow-hidden shadow-lg" />
                             </div>
                         </div>
                         <div className="bg-white/[0.03] p-3 rounded-xl border border-white/5 hover:bg-white/[0.05] transition-all">
-                            <label className="text-[8px] font-bold text-slate-600 uppercase block mb-2 text-center">Заливка</label>
+                            <label className="text-[8px] font-bold text-slate-400 uppercase block mb-2 text-center">Заливка</label>
                             <div className="flex items-center justify-center">
-                                <input type="color" value={style.fillColor} onChange={(e) => handleStyleChange('fillColor', e.target.value)} className="w-10 h-10 rounded-lg cursor-pointer border-2 border-white/10 bg-transparent p-0 overflow-hidden" />
+                                <input type="color" value={style.fillColor} onChange={(e) => handleStyleChange('fillColor', e.target.value)} className="w-10 h-10 rounded-full cursor-pointer border-2 border-white/20 bg-transparent p-0 overflow-hidden shadow-lg" />
                             </div>
                         </div>
                     </div>

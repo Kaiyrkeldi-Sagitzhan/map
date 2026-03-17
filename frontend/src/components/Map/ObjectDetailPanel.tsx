@@ -112,6 +112,14 @@ const typeFields: Record<ObjectType, FormField[]> = {
         },
         { key: 'established', label: 'Established year', type: 'number', placeholder: 'e.g. 1991' },
     ],
+    forest: [
+        { key: 'area_km2', label: 'Area', type: 'number', placeholder: '0', unit: 'km²' },
+        { key: 'tree_type', label: 'Tree type', type: 'text', placeholder: 'e.g. coniferous' },
+    ],
+    building: [
+        { key: 'levels', label: 'Levels', type: 'number', placeholder: '0' },
+        { key: 'material', label: 'Material', type: 'text', placeholder: 'e.g. brick' },
+    ],
     other: [
         { key: 'category', label: 'Category', type: 'text', placeholder: 'e.g. landmark, POI' },
     ],
@@ -166,6 +174,22 @@ const TypeIcon = ({ type, className = 'w-5 h-5' }: { type: ObjectType; className
                 <line x1="5" y1="12" x2="19" y2="12" strokeDasharray="2 3" />
             </svg>
         ),
+        forest: (
+            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 20 18 4 18" />
+                <line x1="12" y1="18" x2="12" y2="22" />
+            </svg>
+        ),
+        building: (
+            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="2" width="16" height="20" />
+                <line x1="9" y1="6" x2="9" y2="6.01" />
+                <line x1="15" y1="6" x2="15" y2="6.01" />
+                <line x1="9" y1="10" x2="9" y2="10.01" />
+                <line x1="15" y1="10" x2="15" y2="10.01" />
+                <rect x="9" y="16" width="6" height="6" />
+            </svg>
+        ),
         other: (
             <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="2" />
@@ -184,6 +208,8 @@ const typeLabels: Record<ObjectType, string> = {
     city: 'City',
     road: 'Road',
     boundary: 'Boundary',
+    forest: 'Forest',
+    building: 'Building',
     other: 'Other',
 }
 
@@ -194,6 +220,8 @@ const typeColors: Record<ObjectType, string> = {
     city: '#f59e0b',
     road: '#6b7280',
     boundary: '#10b981',
+    forest: '#22c55e',
+    building: '#8b5cf6',
     other: '#6366f1',
 }
 

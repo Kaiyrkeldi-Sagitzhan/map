@@ -35,9 +35,9 @@ func (h *GeoObjectHandler) Create(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.Create(c.Request.Context(), userID, &req, isAdmin)
+	resp, err := h.service.Create(c.Request.Context(), userID, &req, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -77,9 +77,9 @@ func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.GetByID(c.Request.Context(), id, userID, isAdmin)
+	resp, err := h.service.GetByID(c.Request.Context(), id, userID, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -106,7 +106,7 @@ func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 // GetAll handles getting all accessible geo objects
 func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
 	// Get type filter from query parameter
 	objType := c.Query("type")
@@ -142,9 +142,9 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 		clip := c.Query("clip") == "true"
 		filterByZoom := c.Query("filterByZoom") != "false" // default true
 
-		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search, metaFilters)
+		resp, err = h.service.GetInBBox(c.Request.Context(), userID, canEdit, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search, metaFilters)
 	} else {
-		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType, search, metaFilters)
+		resp, err = h.service.GetAll(c.Request.Context(), userID, canEdit, objType, search, metaFilters)
 	}
 
 	if err != nil {
@@ -181,9 +181,9 @@ func (h *GeoObjectHandler) Update(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.Update(c.Request.Context(), id, userID, isAdmin, &req)
+	resp, err := h.service.Update(c.Request.Context(), id, userID, canEdit, &req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -226,9 +226,9 @@ func (h *GeoObjectHandler) Delete(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	err = h.service.Delete(c.Request.Context(), id, userID, isAdmin)
+	err = h.service.Delete(c.Request.Context(), id, userID, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"

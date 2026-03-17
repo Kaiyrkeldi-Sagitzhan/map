@@ -113,6 +113,7 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 	// Invalidate cache
 	if s.cache != nil {
 		_ = s.cache.InvalidateLists(ctx)
+		_ = s.cache.InvalidateStats(ctx)
 	}
 
 	return &dto.GeoObjectResponse{
@@ -378,6 +379,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 	// Invalidate cache
 	if s.cache != nil {
 		_ = s.cache.InvalidateLists(ctx)
+		_ = s.cache.InvalidateStats(ctx)
 	}
 
 	resp := toResponse(updated)
@@ -403,6 +405,7 @@ func (s *GeoObjectService) Delete(ctx context.Context, id uuid.UUID, userID uuid
 	err = s.repo.Delete(ctx, id)
 	if err == nil && s.cache != nil {
 		_ = s.cache.InvalidateLists(ctx)
+		_ = s.cache.InvalidateStats(ctx)
 	}
 	return err
 }

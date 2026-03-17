@@ -2,7 +2,10 @@
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'expert' | 'user';
+  first_name: string;
+  last_name: string;
+  nickname: string;
   created_at: string;
 }
 
@@ -20,6 +23,43 @@ export interface RegisterRequest {
   email: string;
   password: string;
   role?: string;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+}
+
+export interface UpdateProfileRequest {
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+  current_password?: string;
+  new_password?: string;
+}
+
+// Admin user management types
+export interface AdminCreateUserRequest {
+  email: string;
+  password: string;
+  role: string;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+}
+
+export interface AdminUpdateUserRequest {
+  email?: string;
+  role?: string;
+  first_name?: string;
+  last_name?: string;
+  nickname?: string;
+  password?: string;
+}
+
+export interface UserListResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 // Geo object types
@@ -36,13 +76,15 @@ export interface GeoObject {
   updated_at: string;
 }
 
-export type ObjectType = 
-  | 'river' 
-  | 'lake' 
-  | 'mountain' 
-  | 'city' 
-  | 'road' 
-  | 'boundary' 
+export type ObjectType =
+  | 'river'
+  | 'lake'
+  | 'mountain'
+  | 'city'
+  | 'road'
+  | 'boundary'
+  | 'forest'
+  | 'building'
   | 'other';
 
 export interface GeoObjectListResponse {
@@ -76,6 +118,8 @@ export interface LayerVisibility {
   city: boolean;
   road: boolean;
   boundary: boolean;
+  forest: boolean;
+  building: boolean;
   other: boolean;
 }
 
@@ -91,13 +135,62 @@ export interface GeoObjectHistory {
   createdAt: string;
 }
 
+// Complaint types
+export interface Complaint {
+  id: string;
+  user_id: string;
+  user_email: string;
+  object_id?: string;
+  object_type: string;
+  object_name?: string;
+  description: string;
+  status: 'pending' | 'in_review' | 'resolved' | 'dismissed';
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateComplaintRequest {
+  object_id?: string;
+  object_type: string;
+  description: string;
+}
+
+export interface UpdateComplaintRequest {
+  status?: string;
+  admin_notes?: string;
+}
+
+export interface ComplaintListResponse {
+  complaints: Complaint[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// Stats types
+export interface TypeStat {
+  type: string;
+  count: number;
+  centroid?: [number, number];
+}
+
+export interface StatsResponse {
+  stats: TypeStat[];
+  total: number;
+}
+
 // Auth context types
 export interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isExpert: boolean;
+  canEdit: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, role?: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
+  updateUser: (user: User) => void;
 }
