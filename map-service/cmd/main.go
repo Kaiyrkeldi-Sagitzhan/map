@@ -49,24 +49,27 @@ func main() {
 	defer db.Close()
 	log.Println("Connected to database successfully")
 
-	// Initialize repository
+	// Initialize repositories
 	geoObjectRepository := repository.NewGeoObjectRepository(db)
+	geoObjectHistoryRepository := repository.NewGeoObjectHistoryRepository(db)
+	complaintRepository := repository.NewComplaintRepository(db)
 
 	// Initialize Redis cache
 	redisCache := repository.NewRedisCache(cfg.RedisURL)
 	defer redisCache.Close()
 
-	// Initialize service
-	geoObjectService := service.NewGeoObjectService(geoObjectRepository, redisCache)
+	// Initialize services
+	geoObjectService := service.NewGeoObjectService(geoObjectRepository, geoObjectHistoryRepository, redisCache)
+	geoObjectHistoryService := service.NewGeoObjectHistoryService(geoObjectHistoryRepository, geoObjectRepository)
+	complaintService := service.NewComplaintService(complaintRepository, redisCache)
 
-	// Initialize handler
+	// Initialize handlers
 	geoObjectHandler := handler.NewGeoObjectHandler(geoObjectService)
+	geoObjectHistoryHandler := handler.NewGeoObjectHistoryHandler(geoObjectHistoryService)
+	complaintHandler := handler.NewComplaintHandler(complaintService)
 
 	// Setup Gin router
 	router := gin.Default()
-
-	// CORS is handled by Nginx gateway
-	// router.Use(middleware.CORSMiddleware())
 
 	// Health check
 	router.GET("/health", geoObjectHandler.HealthCheck)
@@ -83,6 +86,19 @@ func main() {
 			mapGroup.PUT("/objects/:id", geoObjectHandler.Update)
 			mapGroup.DELETE("/objects/:id", geoObjectHandler.Delete)
 			mapGroup.GET("/tiles/:z/:x/:y.pbf", geoObjectHandler.GetTile)
+
+			// History routes
+			mapGroup.GET("/objects/:id/history", geoObjectHistoryHandler.GetByObjectID)
+			mapGroup.POST("/history/:historyId/rollback", geoObjectHistoryHandler.Rollback)
+
+			// Statistics
+			mapGroup.GET("/stats", complaintHandler.GetStats)
+
+			// Complaints
+			mapGroup.POST("/complaints", complaintHandler.Create)
+			mapGroup.GET("/complaints", complaintHandler.List)
+			mapGroup.GET("/complaints/:id", complaintHandler.GetByID)
+			mapGroup.PUT("/complaints/:id", complaintHandler.Update)
 		}
 	}
 

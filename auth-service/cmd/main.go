@@ -56,17 +56,35 @@ func main() {
 	// Initialize repository
 	userRepository := repository.NewUserRepository(db)
 
-	// Initialize service
+	// Initialize services
 	authService := service.NewAuthService(userRepository, tokenManager)
 
+	// Email service
+	emailService := service.NewEmailService(
+		cfg.SMTPHost,
+		cfg.SMTPPort,
+		cfg.SMTPUsername,
+		cfg.SMTPPassword,
+		cfg.SMTPFrom,
+	)
+
+	// Verification service
+	verificationService := service.NewVerificationService(emailService)
+
+	// Google OAuth service
+	googleOAuthService := service.NewGoogleOAuthService(
+		cfg.GoogleClientID,
+		cfg.GoogleClientSecret,
+		cfg.GoogleRedirectURL,
+		userRepository,
+		tokenManager,
+	)
+
 	// Initialize handler
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, verificationService, googleOAuthService)
 
 	// Setup Gin router
 	router := gin.Default()
-
-	// CORS is handled by Nginx gateway
-	// router.Use(middleware.CORSMiddleware())
 
 	// Health check
 	router.GET("/health", authHandler.HealthCheck)
@@ -79,13 +97,31 @@ func main() {
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
+			// Email verification
+			auth.POST("/verify/send", authHandler.SendVerificationCode)
+			auth.POST("/verify", authHandler.VerifyCode)
+			// Google OAuth
+			auth.GET("/google/url", authHandler.GetGoogleAuthURL)
+			auth.GET("/google/callback", authHandler.GoogleCallback)
 		}
 
-		// Protected routes
+		// Protected routes (any authenticated user)
 		protected := api.Group("/auth")
 		protected.Use(middleware.JWTAuth(tokenManager))
 		{
 			protected.GET("/me", authHandler.GetCurrentUser)
+			protected.PUT("/me", authHandler.UpdateMyProfile)
+		}
+
+		// Admin-only routes
+		admin := api.Group("/auth")
+		admin.Use(middleware.JWTAuth(tokenManager), middleware.AdminOnly())
+		{
+			admin.GET("/users", authHandler.ListUsers)
+			admin.POST("/users", authHandler.AdminCreateUser)
+			admin.PUT("/users/:id", authHandler.AdminUpdateUser)
+			admin.DELETE("/users/:id", authHandler.AdminDeleteUser)
+			admin.POST("/users/:id/impersonate", authHandler.ImpersonateUser)
 		}
 	}
 

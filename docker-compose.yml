@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgis/postgis:15-3.3
     container_name: kzmap-postgres
+    command: postgres -c shared_buffers=512MB -c work_mem=64MB -c effective_cache_size=1GB -c random_page_cost=1.1
     environment:
       POSTGRES_DB: kzmap
       POSTGRES_USER: kzmap_user
@@ -30,6 +31,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kzmap-redis
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
       - "6380:6379"
     networks:
@@ -56,6 +58,16 @@ services:
       DB_PASSWORD: kzmap_password
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: http://localhost:3000/auth/google/callback
+      # SMTP (for email verification)
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: noreply@freshmap.team
     ports:
       - "8081:8081"
     depends_on:
@@ -140,6 +152,36 @@ services:
     networks:
       - kzmap-network
     restart: unless-stopped
+
+  # Auto-initialization service
+  init-db:
+    image: postgis/postgis:15-3.3
+    container_name: kzmap-init-db
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      PGPASSWORD: kzmap_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kzmap-network
+    entrypoint: >
+      sh -c "
+      echo 'Checking database state...'
+      count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM information_schema.tables WHERE table_name = 'geo_objects';\")
+      if [ $$count -eq 0 ]; then
+        echo 'Database empty. Running migrations and import...'
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
+        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql
+        ./load_all_gpkg.sh
+      else
+        echo 'Database already initialized.'
+      fi
+      "
 
 volumes:
   postgres_data:

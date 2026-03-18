@@ -35,9 +35,9 @@ func (h *GeoObjectHandler) Create(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.Create(c.Request.Context(), userID, &req, isAdmin)
+	resp, err := h.service.Create(c.Request.Context(), userID, &req, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -77,9 +77,9 @@ func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.GetByID(c.Request.Context(), id, userID, isAdmin)
+	resp, err := h.service.GetByID(c.Request.Context(), id, userID, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -106,7 +106,7 @@ func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 // GetAll handles getting all accessible geo objects
 func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
 	// Get type filter from query parameter
 	objType := c.Query("type")
@@ -118,6 +118,14 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 	maxLatStr := c.Query("maxLat")
 	maxLngStr := c.Query("maxLng")
 	zoomStr := c.Query("zoom")
+
+	// Collect metadata filters (params starting with meta_)
+	metaFilters := make(map[string]string)
+	for k, v := range c.Request.URL.Query() {
+		if len(k) > 5 && k[:5] == "meta_" {
+			metaFilters[k[5:]] = v[0]
+		}
+	}
 
 	var resp *dto.GeoObjectListResponse
 	var err error
@@ -134,9 +142,9 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 		clip := c.Query("clip") == "true"
 		filterByZoom := c.Query("filterByZoom") != "false" // default true
 
-		resp, err = h.service.GetInBBox(c.Request.Context(), userID, isAdmin, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search)
+		resp, err = h.service.GetInBBox(c.Request.Context(), userID, canEdit, objType, minLat, minLng, maxLat, maxLng, zoom, clip, filterByZoom, search, metaFilters)
 	} else {
-		resp, err = h.service.GetAll(c.Request.Context(), userID, isAdmin, objType, search)
+		resp, err = h.service.GetAll(c.Request.Context(), userID, canEdit, objType, search, metaFilters)
 	}
 
 	if err != nil {
@@ -173,9 +181,9 @@ func (h *GeoObjectHandler) Update(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.Update(c.Request.Context(), id, userID, isAdmin, &req)
+	resp, err := h.service.Update(c.Request.Context(), id, userID, canEdit, &req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -218,9 +226,9 @@ func (h *GeoObjectHandler) Delete(c *gin.Context) {
 	}
 
 	userID, _ := middleware.GetUserID(c)
-	isAdmin := middleware.IsAdmin(c)
+	canEdit := middleware.CanEdit(c)
 
-	err = h.service.Delete(c.Request.Context(), id, userID, isAdmin)
+	err = h.service.Delete(c.Request.Context(), id, userID, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -260,19 +268,21 @@ func (h *GeoObjectHandler) GetTile(c *gin.Context) {
 	x, _ := strconv.Atoi(c.Param("x"))
 	y, _ := strconv.Atoi(c.Param("y"))
 
+	log.Printf("[DEBUG] Tile request: z=%d, x=%d, y=%d", z, x, y)
+
 	tile, err := h.service.GetTile(c.Request.Context(), z, x, y)
 	if err != nil {
-		log.Printf("[ERROR] Failed to get tile: %v", err)
+		log.Printf("[ERROR] Failed to get tile %d/%d/%d: %v", z, x, y, err)
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	if tile == nil {
+		log.Printf("[DEBUG] Tile %d/%d/%d is empty", z, x, y)
 		c.Status(http.StatusNoContent)
 		return
 	}
 
 	c.Header("Content-Type", "application/x-protobuf")
-	c.Header("Content-Encoding", "gzip")
 	c.Data(http.StatusOK, "application/x-protobuf", tile)
 }

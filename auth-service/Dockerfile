@@ -2,15 +2,17 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod files and vendor
+# Copy go mod files
 COPY go.mod go.sum ./
-COPY vendor/ vendor/
+
+# Download dependencies
+RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application using vendored dependencies (no internet needed)
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o /auth-service ./cmd/main.go
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -o /auth-service ./cmd/main.go
 
 # Final stage
 FROM alpine:latest

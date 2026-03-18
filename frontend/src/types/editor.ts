@@ -12,6 +12,8 @@ export type DrawTool =
     | 'freehand'
     | 'marker'
     | 'searchArea'
+    | 'edit'
+    | 'history'
 
 // ─── Feature Classes ───────────────────────────────────────
 export type FeatureClass =
@@ -151,12 +153,26 @@ export interface LayerNode {
     featureIds: string[]
 }
 
-// ─── History Entry ─────────────────────────────────────────
+// ─── History Entry (undo/redo) ─────────────────────────────
 export interface HistoryEntry {
     type: 'add' | 'update' | 'delete'
     featureId: string
     before: EditorFeature | null
     after: EditorFeature | null
+}
+
+// ─── Edit History Entry (timeline log) ────────────────────
+export interface EditHistoryEntry {
+    id: string
+    featureId: string
+    featureName: string
+    action: 'create' | 'update' | 'delete'
+    timestamp: number
+    formattedDate: string
+    user: string
+    description: string
+    beforeSnapshot: Partial<EditorFeature> | null
+    afterSnapshot: Partial<EditorFeature> | null
 }
 
 // ─── Mouse Coordinates ─────────────────────────────────────

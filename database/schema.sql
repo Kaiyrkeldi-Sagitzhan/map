@@ -11,9 +11,16 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'user',
+    first_name VARCHAR(100) DEFAULT '',
+    last_name VARCHAR(100) DEFAULT '',
+    nickname VARCHAR(100) DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Index for user name search
+CREATE INDEX IF NOT EXISTS idx_users_name_search
+    ON users (last_name, first_name, nickname);
 
 -- Geo objects table with PostGIS geometry
 CREATE TABLE IF NOT EXISTS geo_objects (
@@ -86,6 +93,27 @@ ON CONFLICT (email) DO NOTHING;
 -- Grant necessary permissions
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO kzmap_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO kzmap_user;
+
+-- Complaints table
+CREATE TABLE IF NOT EXISTS complaints (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    object_id UUID REFERENCES geo_objects(id) ON DELETE SET NULL,
+    object_type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_review', 'resolved', 'dismissed')),
+    admin_notes TEXT DEFAULT '',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_complaints_user ON complaints(user_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_object ON complaints(object_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+
+CREATE TRIGGER update_complaints_updated_at
+    BEFORE UPDATE ON complaints
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Create view for efficient object retrieval (global + owned private)
 CREATE OR REPLACE VIEW accessible_geo_objects AS

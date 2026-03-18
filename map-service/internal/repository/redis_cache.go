@@ -129,6 +129,37 @@ func (c *RedisCache) InvalidateLists(ctx context.Context) error {
 	return nil
 }
 
+// InvalidateTiles clears all cached vector tiles (tile:*).
+// Called after Create/Update/Delete to prevent serving stale tile data.
+func (c *RedisCache) InvalidateTiles(ctx context.Context) error {
+	var cursor uint64
+	var keys []string
+
+	for {
+		var batch []string
+		var err error
+		batch, cursor, err = c.client.Scan(ctx, cursor, "tile:*", 100).Result()
+		if err != nil {
+			log.Printf("[ERROR] Redis Scan error during tile invalidation: %v", err)
+			return err
+		}
+		keys = append(keys, batch...)
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if len(keys) > 0 {
+		if err := c.client.Del(ctx, keys...).Err(); err != nil {
+			log.Printf("[ERROR] Redis Del error during tile invalidation: %v", err)
+			return err
+		}
+		log.Printf("[INFO] Tile cache invalidated %d keys", len(keys))
+	}
+
+	return nil
+}
+
 // getBBoxKey generates a cache key for a bbox query.
 // Coordinates are rounded to a grid (0.5 degree) for cache reuse across similar viewports.
 func getBBoxKey(zoom int, minLat, minLng, maxLat, maxLng float64, objType string, filterByZoom bool) string {
@@ -198,4 +229,23 @@ func (c *RedisCache) GetTile(ctx context.Context, z, x, y int) ([]byte, error) {
 func (c *RedisCache) SetTile(ctx context.Context, z, x, y int, data []byte) error {
 	key := fmt.Sprintf("tile:%d:%d:%d", z, x, y)
 	return c.client.Set(ctx, key, data, 24*time.Hour).Err()
+}
+
+// GetStats retrieves cached dashboard statistics
+func (c *RedisCache) GetStats(ctx context.Context) ([]byte, error) {
+	val, err := c.client.Get(ctx, "dashboard:stats").Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	return []byte(val), err
+}
+
+// SetStats caches dashboard statistics for 1 hour
+func (c *RedisCache) SetStats(ctx context.Context, data []byte) error {
+	return c.client.Set(ctx, "dashboard:stats", data, 1*time.Hour).Err()
+}
+
+// InvalidateStats clears cached dashboard statistics
+func (c *RedisCache) InvalidateStats(ctx context.Context) error {
+	return c.client.Del(ctx, "dashboard:stats").Err()
 }
