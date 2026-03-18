@@ -19,8 +19,8 @@ import type {
   ComplaintListResponse,
 } from '../types';
 
-const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8080';
-const MAP_SERVICE_URL = import.meta.env.VITE_MAP_SERVICE_URL || 'http://localhost:8080';
+const AUTH_SERVICE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || '';
+const MAP_SERVICE_URL = import.meta.env.VITE_MAP_SERVICE_URL || '';
 
 class ApiService {
   private authClient: AxiosInstance;
