@@ -53,9 +53,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
       # Google OAuth
+<<<<<<< HEAD
       GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
       GOOGLE_REDIRECT_URL: http://localhost:3000/auth/google/callback
+=======
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-802334362365-0nuf4kqu0l3lc78kldnalqell9ddop88.apps.googleusercontent.com}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:3000/auth/google/callback}
+>>>>>>> 420a807d (Add geo object versioning and version history features)
       # SMTP (for email verification)
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587

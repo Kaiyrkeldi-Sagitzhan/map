@@ -9,16 +9,19 @@ import (
 
 // GeoObject represents a geographic object in the system
 type GeoObject struct {
-	ID          uuid.UUID       `json:"id" db:"id"`
-	OwnerID     *uuid.UUID      `json:"owner_id,omitempty" db:"owner_id"`
-	Scope       string          `json:"scope" db:"scope"`
-	Type        string          `json:"type" db:"type"`
-	Name        string          `json:"name" db:"name"`
-	Description string          `json:"description,omitempty" db:"description"`
-	Metadata    json.RawMessage `json:"metadata,omitempty" db:"metadata"`
-	Geometry    interface{}     `json:"geometry" db:"geometry"`
-	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
+	ID           uuid.UUID       `json:"id" db:"id"`
+	OwnerID      *uuid.UUID     `json:"owner_id,omitempty" db:"owner_id"`
+	ParentID     *uuid.UUID     `json:"parent_id,omitempty" db:"parent_id"`
+	Scope        string          `json:"scope" db:"scope"`
+	Type         string          `json:"type" db:"type"`
+	Name         string          `json:"name" db:"name"`
+	Description  string          `json:"description,omitempty" db:"description"`
+	Metadata     json.RawMessage `json:"metadata,omitempty" db:"metadata"`
+	Geometry     interface{}     `json:"geometry" db:"geometry"`
+	IsVersion    bool            `json:"is_version" db:"is_version"`
+	VersionNumber int            `json:"version_number" db:"version_number"`
+	CreatedAt    time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at" db:"updated_at"`
 }
 
 // ObjectScope constants
@@ -75,14 +78,17 @@ func IsValidType(objType string) bool {
 
 // GeoObjectWithGeometry represents a geo object with parsed geometry
 type GeoObjectWithGeometry struct {
-	ID          uuid.UUID       `json:"id"`
-	OwnerID     *uuid.UUID      `json:"owner_id,omitempty"`
-	Scope       string          `json:"scope"`
-	Type        string          `json:"type"`
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	Geometry    json.RawMessage `json:"geometry"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID           uuid.UUID       `json:"id"`
+	OwnerID      *uuid.UUID     `json:"owner_id,omitempty"`
+	ParentID     *uuid.UUID     `json:"parent_id,omitempty"`
+	Scope        string         `json:"scope"`
+	Type         string         `json:"type"`
+	Name         string         `json:"name"`
+	Description  string         `json:"description,omitempty"`
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	Geometry     json.RawMessage `json:"geometry"`
+	IsVersion    bool           `json:"is_version"`
+	VersionNumber int           `json:"version_number"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }

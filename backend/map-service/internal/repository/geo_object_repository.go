@@ -19,6 +19,17 @@ var (
 	ErrObjectNotFound = errors.New("object not found")
 )
 
+// GeoObjectRepositoryInterface defines the interface for geo object repository operations
+type GeoObjectRepositoryInterface interface {
+	Create(ctx context.Context, obj *model.GeoObject) error
+	GetByID(ctx context.Context, id uuid.UUID) (*model.GeoObjectWithGeometry, error)
+	GetAll(ctx context.Context, search string) ([]model.GeoObject, error)
+	Update(ctx context.Context, id uuid.UUID, obj *model.GeoObject) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByBBox(ctx context.Context, minLat, minLng, maxLat, maxLng float64, objType string) ([]model.GeoObject, error)
+	GetByType(ctx context.Context, objType string) ([]model.GeoObject, error)
+}
+
 // GeoObjectRepository handles geo object database operations
 type GeoObjectRepository struct {
 	db *sqlx.DB
