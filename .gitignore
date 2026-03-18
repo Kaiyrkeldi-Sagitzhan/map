@@ -30,3 +30,6 @@ Thumbs.db
 bin/
 map-service/map-service
 auth-service/auth-service
+
+.plans/
+.Read-for-me/
