@@ -26,7 +26,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Env
+.env
+
 # Go
 bin/
-map-service/map-service
-auth-service/auth-service
+backend/map-service/map-service
+backend/auth-service/auth-service

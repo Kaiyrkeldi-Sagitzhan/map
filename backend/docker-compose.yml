@@ -1,4 +1,3 @@
-
 services:
   # PostgreSQL with PostGIS for geospatial data
   postgres:
@@ -61,7 +60,7 @@ services:
       # Google OAuth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URL: http://localhost:3000/auth/google/callback
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:3000/auth/google/callback}
       # SMTP (for email verification)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -116,13 +115,9 @@ services:
   # Frontend (React + Vite)
   frontend:
     build:
-      context: ./frontend
+      context: ../frontend
       dockerfile: Dockerfile
     container_name: kzmap-frontend
-    environment:
-      VITE_API_URL: http://localhost:8080
-      VITE_AUTH_SERVICE_URL: http://api-gateway
-      VITE_MAP_SERVICE_URL: http://api-gateway
     ports:
       - "3000:3000"
     depends_on:
