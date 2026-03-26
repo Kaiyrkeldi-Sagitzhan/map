@@ -262,6 +262,17 @@ export default function LayersPanel() {
                                         .map((entry, idx) => {
                                         const actionInfo = ACTION_LABELS[entry.action] || { label: entry.action, color: 'text-slate-400', bgColor: 'bg-slate-500/10' }
                                         const isLatest = idx === 0
+                                        const before = entry.beforeSnapshot
+                                        const after = entry.afterSnapshot
+                                        const changes: string[] = []
+                                        if (before && after) {
+                                            if (before.name !== after.name) changes.push(`Имя: "${before.name}" → "${after.name}"`)
+                                            if (before.type !== after.type) changes.push(`Тип: ${before.type} → ${after.type}`)
+                                            if (before.scope !== after.scope) changes.push(`Область: ${before.scope} → ${after.scope}`)
+                                            if (JSON.stringify(before.geometry) !== JSON.stringify(after.geometry)) changes.push('Геометрия изменена')
+                                            if (before.description !== after.description) changes.push('Описание изменено')
+                                            if (JSON.stringify(before.metadata) !== JSON.stringify(after.metadata)) changes.push('Стиль изменён')
+                                        }
                                         return (
                                             <div
                                                 key={entry.id}
@@ -280,7 +291,15 @@ export default function LayersPanel() {
                                                         <span className="text-[9px] text-slate-500 font-mono">{new Date(entry.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
                                                     </div>
                                                     <p className="text-[11px] font-medium text-slate-200 leading-snug">{entry.description}</p>
-                                                    
+
+                                                    {changes.length > 0 && (
+                                                        <div className="mt-1.5 space-y-0.5">
+                                                            {changes.map((c, i) => (
+                                                                <p key={i} className="text-[9px] text-amber-400/80 leading-snug">{c}</p>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
                                                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
                                                         <span className={`text-[8px] uppercase font-bold tracking-wider ${isLatest ? 'text-[#10B981]' : 'text-slate-600'}`}>{isLatest ? 'Текущая версия' : 'Версия из истории'}</span>
                                                         {!isLatest && (
