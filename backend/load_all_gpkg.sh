@@ -2,11 +2,11 @@
 # PRO GeoPackage to PostGIS Loader
 # Capturing EVERY SINGLE ATTRIBUTE for advanced cartography
 
-DB_HOST="localhost"
-DB_PORT="5433"
-DB_NAME="kzmap"
-DB_USER="kzmap_user"
-DB_PASS="kzmap_password"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5433}"
+DB_NAME="${DB_NAME:-kzmap}"
+DB_USER="${DB_USER:-kzmap_user}"
+DB_PASS="${DB_PASS:-kzmap_password}"
 GPKG_FILE="gpkg_data/kazakhstan.gpkg"
 OWNER_ID="00000000-0000-0000-0000-000000000001" # Admin user
 
