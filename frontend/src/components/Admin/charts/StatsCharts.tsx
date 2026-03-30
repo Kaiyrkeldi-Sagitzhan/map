@@ -64,7 +64,15 @@ const CustomTooltip = ({ active, payload }: any) => {
   )
 }
 
+const EmptyChartState = ({ label }: { label: string }) => (
+  <div className="w-full h-[280px] flex items-center justify-center text-slate-500 text-xs">
+    {label}
+  </div>
+)
+
 export const ObjectPieChart = ({ data, onItemClick }: ChartProps) => {
+  if (!data.length) return <EmptyChartState label="Нет данных для круговой диаграммы" />
+
   return (
     <ResponsiveContainer width="100%" height={280}>
       <PieChart>
@@ -98,6 +106,8 @@ export const ObjectPieChart = ({ data, onItemClick }: ChartProps) => {
 }
 
 export const ObjectBarChart = ({ data, onItemClick }: ChartProps) => {
+  if (!data.length) return <EmptyChartState label="Нет данных для столбчатой диаграммы" />
+
   return (
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -131,6 +141,8 @@ export const ObjectBarChart = ({ data, onItemClick }: ChartProps) => {
 }
 
 export const ObjectRadarChart = ({ data }: ChartProps) => {
+  if (!data.length) return <EmptyChartState label="Нет данных для радарного анализа" />
+
   return (
     <ResponsiveContainer width="100%" height={280}>
       <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
