@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,46 +20,63 @@ import (
 
 // GoogleOAuthService handles Google OAuth flow
 type GoogleOAuthService struct {
-	clientID     string
-	clientSecret string
-	redirectURL  string
-	userRepo     *repository.UserRepository
-	tokenManager interface {
+	clientID            string
+	clientSecret        string
+	defaultRedirectURL  string
+	allowedRedirectURLs map[string]struct{}
+	userRepo            *repository.UserRepository
+	tokenManager        interface {
 		GenerateToken(userID uuid.UUID, email, role string) (string, error)
 	}
 }
 
 // NewGoogleOAuthService creates a new Google OAuth service
-func NewGoogleOAuthService(clientID, clientSecret, redirectURL string, userRepo *repository.UserRepository, tokenMgr interface {
+func NewGoogleOAuthService(clientID, clientSecret, redirectURL string, allowedRedirectURLs []string, userRepo *repository.UserRepository, tokenMgr interface {
 	GenerateToken(userID uuid.UUID, email, role string) (string, error)
 }) *GoogleOAuthService {
+	allowed := make(map[string]struct{})
+	for _, rawURL := range allowedRedirectURLs {
+		normalized, ok := normalizeRedirectURL(rawURL)
+		if ok {
+			allowed[normalized] = struct{}{}
+		}
+	}
+
+	normalizedDefault, ok := normalizeRedirectURL(redirectURL)
+	if !ok {
+		normalizedDefault = "http://localhost:3000/auth/google/callback"
+	}
+	allowed[normalizedDefault] = struct{}{}
+
 	return &GoogleOAuthService{
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		redirectURL:  redirectURL,
-		userRepo:     userRepo,
-		tokenManager: tokenMgr,
+		clientID:            clientID,
+		clientSecret:        clientSecret,
+		defaultRedirectURL:  normalizedDefault,
+		allowedRedirectURLs: allowed,
+		userRepo:            userRepo,
+		tokenManager:        tokenMgr,
 	}
 }
 
 // GetAuthURL returns the Google OAuth URL
-func (s *GoogleOAuthService) GetAuthURL(state string) string {
+func (s *GoogleOAuthService) GetAuthURL(state string, redirectURL string) string {
+	resolvedRedirectURL := s.resolveRedirectURL(redirectURL)
 	return fmt.Sprintf(
 		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=email%%20profile&state=%s&access_type=offline",
 		s.clientID,
-		s.redirectURL,
+		resolvedRedirectURL,
 		state,
 	)
 }
 
 // ExchangeCode exchanges the authorization code for tokens
-func (s *GoogleOAuthService) ExchangeCode(ctx context.Context, code string) (*googleTokenResponse, error) {
+func (s *GoogleOAuthService) ExchangeCode(ctx context.Context, code string, redirectURL string) (*googleTokenResponse, error) {
 	data := fmt.Sprintf(
 		"code=%s&client_id=%s&client_secret=%s&redirect_uri=%s&grant_type=authorization_code",
 		code,
 		s.clientID,
 		s.clientSecret,
-		s.redirectURL,
+		redirectURL,
 	)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://oauth2.googleapis.com/token", strings.NewReader(data))
@@ -140,9 +158,11 @@ type GoogleUserInfo struct {
 }
 
 // HandleGoogleCallback handles the OAuth callback and creates/updates user
-func (s *GoogleOAuthService) HandleGoogleCallback(ctx context.Context, code string) (*dto.AuthResponse, error) {
+func (s *GoogleOAuthService) HandleGoogleCallback(ctx context.Context, code string, redirectURL string) (*dto.AuthResponse, error) {
+	resolvedRedirectURL := s.resolveRedirectURL(redirectURL)
+
 	// Exchange code for token
-	token, err := s.ExchangeCode(ctx, code)
+	token, err := s.ExchangeCode(ctx, code, resolvedRedirectURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code: %w", err)
 	}
@@ -192,6 +212,39 @@ func (s *GoogleOAuthService) HandleGoogleCallback(ctx context.Context, code stri
 			CreatedAt: user.CreatedAt.Format(time.RFC3339),
 		},
 	}, nil
+}
+
+func (s *GoogleOAuthService) resolveRedirectURL(candidate string) string {
+	normalized, ok := normalizeRedirectURL(candidate)
+	if ok {
+		if _, exists := s.allowedRedirectURLs[normalized]; exists {
+			return normalized
+		}
+	}
+
+	return s.defaultRedirectURL
+}
+
+func normalizeRedirectURL(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", false
+	}
+	if parsed.Host == "" || parsed.Path == "" {
+		return "", false
+	}
+
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return strings.TrimRight(parsed.String(), "/"), true
 }
 
 // parseJWT parses a JWT token without verification (for getting claims)

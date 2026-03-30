@@ -24,7 +24,8 @@ export default function OAuthCallback() {
       }
 
       try {
-        const response = await apiService.handleGoogleCallback(code)
+        const redirectUri = `${window.location.origin}/auth/google/callback`
+        const response = await apiService.handleGoogleCallback(code, redirectUri)
         localStorage.setItem('token', response.token)
         localStorage.setItem('user', JSON.stringify(response.user))
         // Role-based redirect

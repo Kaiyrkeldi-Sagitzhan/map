@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"auth-service/internal/dto"
 	"auth-service/internal/service"
@@ -472,7 +473,15 @@ func (h *AuthHandler) VerifyCode(c *gin.Context) {
 // GetGoogleAuthURL returns the Google OAuth URL
 func (h *AuthHandler) GetGoogleAuthURL(c *gin.Context) {
 	state := "google_oauth"
-	url := h.googleOAuthSvc.GetAuthURL(state)
+	redirectURI := c.Query("redirect_uri")
+	if redirectURI == "" {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		if origin != "" {
+			redirectURI = strings.TrimRight(origin, "/") + "/auth/google/callback"
+		}
+	}
+
+	url := h.googleOAuthSvc.GetAuthURL(state, redirectURI)
 	c.JSON(http.StatusOK, dto.GoogleOAuthURLResponse{
 		URL: url,
 	})
@@ -489,7 +498,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.googleOAuthSvc.HandleGoogleCallback(c.Request.Context(), code)
+	redirectURI := c.Query("redirect_uri")
+	resp, err := h.googleOAuthSvc.HandleGoogleCallback(c.Request.Context(), code, redirectURI)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "oauth_error",

@@ -76,6 +76,7 @@ func main() {
 		cfg.GoogleClientID,
 		cfg.GoogleClientSecret,
 		cfg.GoogleRedirectURL,
+		cfg.GoogleAllowedRedirectURLs,
 		userRepository,
 		tokenManager,
 	)
