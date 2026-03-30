@@ -36,12 +36,14 @@ const AdminLayout = () => {
       >
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/5">
-          <span
-            className="text-[22px] font-normal tracking-wide text-[#10B981]"
+          <button
+            type="button"
+            onClick={() => navigate('/editor')}
+            className="text-[22px] font-normal tracking-wide text-[#10B981] hover:opacity-90 transition-opacity"
             style={{ fontFamily: "'IM Fell Great Primer', serif" }}
           >
             freshmap
-          </span>
+          </button>
           <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">Панель администратора</p>
         </div>
 

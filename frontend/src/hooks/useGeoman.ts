@@ -54,11 +54,42 @@ export function useGeoman() {
 
     const searchLayers = useRef<L.Layer[]>([])
 
+    const getDrawOptions = useCallback((tool: DrawTool) => {
+        const style = CLASS_STYLES[featureClass]
+        const isSearchArea = tool === 'searchArea'
+        const isPolygonLike = tool === 'drawPolygon' || tool === 'searchArea' || tool === 'freehand'
+
+        return {
+            freehandMode: tool === 'freehand',
+            continueDrawing: tool === 'drawPolygon',
+            snappable: isPolygonLike,
+            snapDistance: isPolygonLike ? 20 : 12,
+            finishOn: isPolygonLike ? 'snap' : undefined,
+            pathOptions: {
+                color: isSearchArea ? '#6366f1' : style.color,
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                weight: isSearchArea ? 1 : style.weight,
+            },
+        }
+    }, [featureClass])
+
     // ─── Track Keys (Shift & Escape) ────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => { 
-            if (e.key === 'Shift') isShiftHeld.current = true 
+            if (e.key === 'Shift') {
+                isShiftHeld.current = true
+                if (currentTool === 'searchArea') {
+                    map.pm.disableDraw()
+                    map.pm.enableDraw('Rectangle' as any, getDrawOptions('searchArea') as any)
+                }
+            }
             if (e.key === 'Escape') {
+                if (currentTool === 'searchArea') {
+                    map.pm.disableDraw()
+                    map.pm.enableDraw('Polygon' as any, getDrawOptions('searchArea') as any)
+                    return
+                }
                 setSelectedFeature(null)
                 useEditorStore.getState().clearSearchResults()
                 // Also disable any active geoman draw/edit
@@ -66,14 +97,22 @@ export function useGeoman() {
                 map.pm.disableGlobalEditMode()
             }
         }
-        const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') isShiftHeld.current = false }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') {
+                isShiftHeld.current = false
+                if (currentTool === 'searchArea') {
+                    map.pm.disableDraw()
+                    map.pm.enableDraw('Polygon' as any, getDrawOptions('searchArea') as any)
+                }
+            }
+        }
         window.addEventListener('keydown', handleKeyDown)
         window.addEventListener('keyup', handleKeyUp)
         return () => {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [map, setSelectedFeature])
+    }, [map, setSelectedFeature, currentTool, getDrawOptions])
 
     // ─── Sync search results to map ──────────────────────────
     useEffect(() => {
@@ -141,8 +180,8 @@ export function useGeoman() {
     useEffect(() => {
         if (!map) return
         map.pm.setGlobalOptions({
-            snappable: currentTool !== 'searchArea',
-            snapDistance: 3,
+            snappable: true,
+            snapDistance: 12,
             allowSelfIntersection: false,
             templineStyle: { color: '#6366f1', weight: 2 },
             hintlineStyle: { color: '#6366f1', weight: 2, dashArray: '5,5' },
@@ -163,7 +202,7 @@ export function useGeoman() {
             removalMode: false,
             rotateMode: false,
         })
-    }, [map, currentTool])
+    }, [map])
 
     // ─── Track mouse ────────────────────────────────────────
     useEffect(() => {
@@ -298,20 +337,11 @@ export function useGeoman() {
         } else {
             const geomanMode = toolToGeomanMode(currentTool, isShiftHeld.current)
             if (geomanMode) {
-                const style = CLASS_STYLES[featureClass]
-                map.pm.enableDraw(geomanMode as any, {
-                    freehandMode: currentTool === 'freehand',
-                    pathOptions: {
-                        color: currentTool === 'searchArea' ? '#6366f1' : style.color,
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
-                        weight: currentTool === 'searchArea' ? 1 : style.weight,
-                    },
-                })
+                map.pm.enableDraw(geomanMode as any, getDrawOptions(currentTool) as any)
             }
         }
         prevTool.current = currentTool
-    }, [map, currentTool, featureClass])
+    }, [map, currentTool, getDrawOptions])
 
     // ─── Handle pm:create ────────────────────────────────────
     const handleCreate = useCallback(async (e: any) => {
