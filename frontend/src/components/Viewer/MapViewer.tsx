@@ -45,8 +45,8 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
     const map = useMap()
     const animated = useRef(false)
     const setMouseCoords = useViewerStore((s) => s.setMouseCoords)
-    const { activeTool, setSelectedFeature, fetchFeatureHistory, setActiveTool, setHighlight } = useViewerStore()
-    const clearHighlight = useViewerStore((s) => s.clearHighlight)
+    const { activeTool, setSelectedFeature, toggleSelectedFeature, fetchFeatureHistory, setActiveTool, setHighlight } = useViewerStore()
+    const clearSelection = useViewerStore((s) => s.clearSelection)
 
     // Refs for latest values (avoid re-registering event handlers)
     const activeToolRef = useRef(activeTool)
@@ -57,6 +57,7 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
 
     // Shift key tracking for Polygon vs Rectangle in search area
     const isShiftHeld = useRef(false)
+    const lastForwardedFeatureClickAt = useRef(0)
 
     // Helper: convert backend object to ViewerFeature
     const mapObjToFeature = (obj: any) => ({
@@ -180,16 +181,15 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 if (activeToolRef.current === 'searchArea') return // Geoman handles ESC
-                setSelectedFeature(null)
-                clearHighlight()
+                clearSelection()
             }
         }
         window.addEventListener('keydown', onKeyDown)
         return () => window.removeEventListener('keydown', onKeyDown)
-    }, [setSelectedFeature, clearHighlight])
+    }, [clearSelection])
 
     // ─── Pick object: direct ID if available, bbox fallback (like editor) ──
-    const pickObject = useCallback(async (latlng: L.LatLng, featureProps?: any) => {
+    const pickObject = useCallback(async (latlng: L.LatLng, featureProps?: any, additiveSelect = false) => {
         let obj: any = null
 
         try {
@@ -231,15 +231,21 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
                 return
             }
 
-            setSelectedFeature(viewerFeature)
+            if (additiveSelect) {
+                toggleSelectedFeature(viewerFeature)
+            } else {
+                setSelectedFeature(viewerFeature)
+            }
             setHighlight(viewerFeature.geometry, {
                 color: '#ff4500', fillColor: '#ff4500', weight: 4, fillOpacity: 0.25,
             })
-            await fetchFeatureHistory(obj.id)
+            if (activeToolRef.current === 'history') {
+                await fetchFeatureHistory(obj.id)
+            }
         } catch (err) {
             console.error('Viewer Pick failed:', err)
         }
-    }, [map, setSelectedFeature, fetchFeatureHistory, setHighlight, clearHighlight])
+    }, [map, setSelectedFeature, toggleSelectedFeature, fetchFeatureHistory, setHighlight])
 
     // ─── Unified click + mousemove via direct map.on() ──────
     // This is the same pattern as editor's useGeoman.ts (line 254-282).
@@ -255,11 +261,23 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
             const tool = activeToolRef.current
             // Geoman handles searchArea clicks internally — do not intercept
             if (tool === 'searchArea') return
-            // Skip duplicate native click if VTL already forwarded this event
+
+            // Skip duplicate native map click after vector-tile forwarded click.
+            // In some browsers originalEvent marker is not reliably preserved.
+            const now = Date.now()
+            if (e.featureProperties) {
+                lastForwardedFeatureClickAt.current = now
+            } else if (now - lastForwardedFeatureClickAt.current < 250) {
+                return
+            }
+
+            // Extra guard when originalEvent marker is present.
             if (!e.featureProperties && e.originalEvent?._featureHandled) return
+
             // History, complaint, select — pick object (ID fast path + bbox fallback)
             if (tool === 'select' || tool === 'history' || tool === 'complaint') {
-                pickObject(e.latlng, e.featureProperties)
+                const isShiftSelect = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey || isShiftHeld.current
+                pickObject(e.latlng, e.featureProperties, isShiftSelect && (tool === 'select' || tool === 'history'))
             }
         }
 
@@ -386,10 +404,28 @@ const HighlightOverlay = () => {
 const SearchResultsOverlay = () => {
     const map = useMap()
     const layersRef = useRef<L.Layer[]>([])
+    const isShiftHeldRef = useRef(false)
     const searchResults = useViewerStore((s) => s.searchResults)
     const setSelectedFeature = useViewerStore((s) => s.setSelectedFeature)
+    const toggleSelectedFeature = useViewerStore((s) => s.toggleSelectedFeature)
     const setHighlight = useViewerStore((s) => s.setHighlight)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
+    const activeTool = useViewerStore((s) => s.activeTool)
+
+    useEffect(() => {
+        const down = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeldRef.current = true
+        }
+        const up = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeldRef.current = false
+        }
+        window.addEventListener('keydown', down)
+        window.addEventListener('keyup', up)
+        return () => {
+            window.removeEventListener('keydown', down)
+            window.removeEventListener('keyup', up)
+        }
+    }, [])
 
     useEffect(() => {
         // Cleanup old layers
@@ -425,11 +461,18 @@ const SearchResultsOverlay = () => {
             geoLayer.eachLayer(l => {
                 l.on('click', (e: any) => {
                     L.DomEvent.stopPropagation(e)
-                    setSelectedFeature(f)
+                    const isShiftSelect = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey || isShiftHeldRef.current
+                    if (isShiftSelect) {
+                        toggleSelectedFeature(f)
+                    } else {
+                        setSelectedFeature(f)
+                    }
                     setHighlight(f.geometry, {
                         color: '#ff4500', fillColor: '#ff4500', weight: 4, fillOpacity: 0.25,
                     })
-                    fetchFeatureHistory(f.backendId || f.id)
+                    if (activeTool === 'history') {
+                        fetchFeatureHistory(f.backendId || f.id)
+                    }
                 })
                 l.addTo(map)
                 layersRef.current.push(l)
@@ -440,7 +483,7 @@ const SearchResultsOverlay = () => {
             layersRef.current.forEach(l => map.removeLayer(l))
             layersRef.current = []
         }
-    }, [map, searchResults, setSelectedFeature, setHighlight, fetchFeatureHistory])
+    }, [map, searchResults, setSelectedFeature, toggleSelectedFeature, setHighlight, fetchFeatureHistory, activeTool])
 
     return null
 }
