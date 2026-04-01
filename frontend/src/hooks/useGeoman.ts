@@ -19,7 +19,7 @@ function toolToGeomanMode(tool: DrawTool, isShiftHeld: boolean = false): string 
         case 'drawRectangle': return 'Rectangle'
         case 'drawCircle': return 'Circle'
         case 'drawLine': return 'Line'
-        case 'freehand': return 'Polygon'
+        case 'freehand': return null
         case 'marker': return 'Marker'
         case 'searchArea': return isShiftHeld ? 'Rectangle' : 'Polygon'
         default: return null
@@ -42,10 +42,13 @@ export function useGeoman() {
         features,
         searchResults,
         selectedFeatureId,
+        selectedFeatureIds,
         addFeature,
         updateFeature,
         deleteFeature,
         setSelectedFeature,
+        toggleSelectedFeature,
+        clearSelection,
         setSelectedFeatureById,
         setMouseCoords,
         setLoading,
@@ -57,19 +60,22 @@ export function useGeoman() {
     const getDrawOptions = useCallback((tool: DrawTool) => {
         const style = CLASS_STYLES[featureClass]
         const isSearchArea = tool === 'searchArea'
-        const isPolygonLike = tool === 'drawPolygon' || tool === 'searchArea' || tool === 'freehand'
+        const isPolygonLike = tool === 'drawPolygon' || tool === 'searchArea'
+        const isFreehand = tool === 'freehand'
 
         return {
-            freehandMode: tool === 'freehand',
+            freehandMode: isFreehand,
+            simplifyFactor: isFreehand ? 0 : undefined,
             continueDrawing: tool === 'drawPolygon',
             snappable: isPolygonLike,
-            snapDistance: isPolygonLike ? 20 : 12,
+            snapDistance: isPolygonLike ? 20 : (isFreehand ? 0 : 12),
             finishOn: isPolygonLike ? 'snap' : undefined,
             pathOptions: {
                 color: isSearchArea ? '#6366f1' : style.color,
                 fillColor: 'transparent',
                 fillOpacity: 0,
                 weight: isSearchArea ? 1 : style.weight,
+                smoothFactor: isFreehand ? 0 : undefined,
             },
         }
     }, [featureClass])
@@ -90,7 +96,7 @@ export function useGeoman() {
                     map.pm.enableDraw('Polygon' as any, getDrawOptions('searchArea') as any)
                     return
                 }
-                setSelectedFeature(null)
+                clearSelection()
                 useEditorStore.getState().clearSearchResults()
                 // Also disable any active geoman draw/edit
                 map.pm.disableDraw()
@@ -112,7 +118,7 @@ export function useGeoman() {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [map, setSelectedFeature, currentTool, getDrawOptions])
+    }, [map, clearSelection, currentTool, getDrawOptions])
 
     // ─── Sync search results to map ──────────────────────────
     useEffect(() => {
@@ -213,7 +219,7 @@ export function useGeoman() {
     }, [map, setMouseCoords])
 
     // ─── Edit/History tool: click to pick object ─────────────
-    const pickObjectAt = useCallback(async (latlng: L.LatLng) => {
+    const pickObjectAt = useCallback(async (latlng: L.LatLng, additiveSelect: boolean = false) => {
         console.log('[pickObjectAt] called at', latlng.lat, latlng.lng, 'filter by:', featureClass)
         setLoading(true)
         const zoom = map.getZoom()
@@ -271,7 +277,9 @@ export function useGeoman() {
                     targetFid = newFeature.id
                 }
                 
-                if (targetFid !== useEditorStore.getState().selectedFeatureId) {
+                if (additiveSelect) {
+                    toggleSelectedFeature(targetFid)
+                } else if (targetFid !== useEditorStore.getState().selectedFeatureId) {
                     setSelectedFeature(targetFid)
                 }
 
@@ -288,7 +296,7 @@ export function useGeoman() {
         } finally {
             setLoading(false)
         }
-    }, [map, addFeature, setSelectedFeature, setLoading, currentTool, featureClass])
+    }, [map, addFeature, setSelectedFeature, toggleSelectedFeature, setLoading, currentTool, featureClass])
 
     useEffect(() => {
         if (!map) return
@@ -300,9 +308,11 @@ export function useGeoman() {
             if ((e.originalEvent as any)?._simulated) return
             console.log('[useGeoman] map click, tool =', currentTool, 'isEditOrHistory =', isEditOrHistory)
             if (isEditOrHistory) {
-                pickObjectAt(e.latlng)
+                pickObjectAt(e.latlng, !!(e.originalEvent as MouseEvent | undefined)?.shiftKey)
             } else if (currentTool === 'select') {
-                setSelectedFeature(null)
+                if (!(e.originalEvent as MouseEvent | undefined)?.shiftKey) {
+                    clearSelection()
+                }
             }
         }
         map.on('click', onMapClick)
@@ -318,7 +328,7 @@ export function useGeoman() {
             map.off('click', onMapClick)
             container.classList.remove('cursor-pencil')
         }
-    }, [map, currentTool, pickObjectAt])
+    }, [map, currentTool, pickObjectAt, clearSelection])
 
     // ─── Sync draw mode ──────────────────────────────────────
     useEffect(() => {
@@ -395,11 +405,14 @@ export function useGeoman() {
         layer.on('click', (e: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(e)
             const fid = layerToFeatureId.current.get(layer)
-            if (fid) setSelectedFeature(fid)
+            if (!fid) return
+            const additive = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey
+            if (additive) toggleSelectedFeature(fid)
+            else setSelectedFeature(fid)
         })
         addFeature(newFeature)
         saveFeatureToBackend(newFeature)
-    }, [currentTool, map, featureClass, addFeature, setSelectedFeature])
+    }, [currentTool, map, featureClass, addFeature, setSelectedFeature, toggleSelectedFeature])
 
     const handleEdit = useCallback((e: any) => {
         const layer = e.layer as L.Layer
@@ -452,6 +465,68 @@ export function useGeoman() {
         }
     }, [map, handleCreate, handleEdit, handleRemove])
 
+    // ─── Custom Freehand Drawing ──────────────────────────────
+    useEffect(() => {
+        if (!map) return
+        if (currentTool !== 'freehand') {
+            map.dragging.enable() // ensure dragging is enabled
+            return
+        }
+
+        let freehandLayer: L.Polyline | null = null
+        let isDrawingFreehand = false
+        const style = CLASS_STYLES[featureClass] || { color: '#000', weight: 2 }
+
+        const onMouseDown = (e: L.LeafletMouseEvent) => {
+            if ((e.originalEvent as MouseEvent).button !== 0) return // only left click
+            isDrawingFreehand = true
+            map.dragging.disable()
+            freehandLayer = L.polyline([e.latlng], {
+                color: style.color as string,
+                weight: style.weight as number,
+                smoothFactor: 1.5,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map)
+        }
+
+        const onMouseMove = (e: L.LeafletMouseEvent) => {
+            if (!isDrawingFreehand || !freehandLayer) return
+            freehandLayer.addLatLng(e.latlng)
+        }
+
+        const onMouseUp = () => {
+            if (!isDrawingFreehand || !freehandLayer) return
+            isDrawingFreehand = false
+            map.dragging.enable()
+            
+            const latlngs = freehandLayer.getLatLngs() as L.LatLng[]
+            if (latlngs.length > 2) {
+                // handleCreate will use this layer
+                handleCreate({ layer: freehandLayer })
+            } else {
+                map.removeLayer(freehandLayer)
+            }
+            freehandLayer = null
+        }
+
+        map.on('mousedown', onMouseDown)
+        map.on('mousemove', onMouseMove)
+        map.on('mouseup', onMouseUp)
+
+        const container = map.getContainer()
+        container.style.cursor = 'crosshair'
+
+        return () => {
+            map.off('mousedown', onMouseDown)
+            map.off('mousemove', onMouseMove)
+            map.off('mouseup', onMouseUp)
+            container.style.cursor = ''
+            if (isDrawingFreehand && freehandLayer) map.removeLayer(freehandLayer)
+            map.dragging.enable()
+        }
+    }, [map, currentTool, featureClass, handleCreate])
+
     // ─── Load features ───────────────────────────────────────
     useEffect(() => {
         if (!map) return
@@ -496,7 +571,9 @@ export function useGeoman() {
                         }
                     }
 
-                    setSelectedFeature(f.id)
+                    const additive = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey
+                    if (additive) toggleSelectedFeature(f.id)
+                    else setSelectedFeature(f.id)
                 })
                 
                 // CRITICAL: Attach edit listeners to the specific layer
@@ -506,100 +583,148 @@ export function useGeoman() {
                 if (f.visible) layer.addTo(map)
             })
         })
-    }, [map, features, setSelectedFeature])
+    }, [map, features, setSelectedFeature, toggleSelectedFeature])
 
     // ─── Sync visibility & selection ─────────────────────────
+    // ─── Sync Features to Map ──────────────────────────────────
     useEffect(() => {
-        const currentFeatureIds = new Set(features.map(f => f.id))
-        featureIdToLayer.current.forEach((layer, fid) => {
-            if (!currentFeatureIds.has(fid)) {
-                map.removeLayer(layer)
+        try {
+            // Remove layers for deleted features
+            const currentFeatureIds = new Set(features.map(f => f.id))
+            const layersToRemove: string[] = []
+            featureIdToLayer.current.forEach((layer, fid) => {
+                if (!currentFeatureIds.has(fid)) {
+                    try {
+                        map.removeLayer(layer)
+                    } catch (e) {
+                        console.warn('[useGeoman] Failed to remove layer', fid, e)
+                    }
+                    layersToRemove.push(fid)
+                }
+            })
+            layersToRemove.forEach(fid => {
                 featureIdToLayer.current.delete(fid)
                 lastSyncedGeometry.current.delete(fid)
                 geomanEditedIds.current.delete(fid)
-            }
-        })
+            })
 
-        features.forEach((f) => {
-            const layer = featureIdToLayer.current.get(f.id)
-            if (!layer) return
-            if (f.visible && !map.hasLayer(layer)) layer.addTo(map)
-            else if (!f.visible && map.hasLayer(layer)) map.removeLayer(layer)
+            // Sync each feature's state to its layer
+            features.forEach((f) => {
+                try {
+                    const layer = featureIdToLayer.current.get(f.id)
+                    if (!layer) return
 
-            if ('setStyle' in layer) {
-                const style = getAdvancedStyle(f.featureClass, f.metadata, f.style)
-                const isLine = f.featureClass === 'road' || f.featureClass === 'river'
-                const isSelected = f.id === selectedFeatureId;
+                    const isSelected = selectedFeatureIds.includes(f.id)
+                    const isPrimarySelected = f.id === selectedFeatureId
 
-                // Sync Geometry — smart sync handles undo/rollback even when pm is enabled
-                const geoKey = JSON.stringify(f.geometry)
-                const lastKey = lastSyncedGeometry.current.get(f.id)
-
-                if (geomanEditedIds.current.has(f.id)) {
-                    // Change came from geoman drag — layer already has correct coords
-                    geomanEditedIds.current.delete(f.id)
-                    lastSyncedGeometry.current.set(f.id, geoKey)
-                } else if (geoKey !== lastKey) {
-                    // Change came from store (undo/rollback) — force sync to map
-                    const pmLayer = (layer as any).pm
-                    const wasEditing = pmLayer?.enabled()
-                    if (wasEditing) pmLayer.disable()
-
-                    if (f.geometry.type === 'Point') {
-                        const c = f.geometry.coordinates as number[]
-                        ;(layer as any).setLatLng([c[1], c[0]])
-                    } else if (f.geometry.type === 'LineString' || f.geometry.type === 'Polygon') {
-                        const coords = L.GeoJSON.coordsToLatLngs(
-                            f.geometry.coordinates,
-                            f.geometry.type === 'Polygon' ? 1 : 0
-                        )
-                        ;(layer as any).setLatLngs(coords as any)
-                    } else if (f.geometry.type === 'MultiPolygon') {
-                        const coords = L.GeoJSON.coordsToLatLngs(f.geometry.coordinates, 2)
-                        ;(layer as any).setLatLngs(coords as any)
-                    } else if (f.geometry.type === 'MultiLineString') {
-                        const coords = L.GeoJSON.coordsToLatLngs(f.geometry.coordinates, 1)
-                        ;(layer as any).setLatLngs(coords as any)
+                    // Visibility sync
+                    try {
+                        if (f.visible && !map.hasLayer(layer)) {
+                            layer.addTo(map)
+                        } else if (!f.visible && map.hasLayer(layer)) {
+                            map.removeLayer(layer)
+                        }
+                    } catch (e) {
+                        console.warn('[useGeoman] Visibility sync failed for', f.id)
                     }
 
-                    if (wasEditing) pmLayer.enable({ allowSelfIntersection: false, snappable: true })
-                    lastSyncedGeometry.current.set(f.id, geoKey)
+                    // Only apply styling if layer supports it
+                    if ('setStyle' in layer) {
+                        // Geometry sync only if changed (and NOT currently being edited)
+                        const geoKey = JSON.stringify(f.geometry)
+                        const lastKey = lastSyncedGeometry.current.get(f.id)
+                        const isCurrentlyBeingEdited = (layer as any)?.pm?.enabled?.() === true
+
+                        // SKIP geometry sync if user is currently editing this layer
+                        if (!isCurrentlyBeingEdited && !geomanEditedIds.current.has(f.id) && geoKey !== lastKey) {
+                            try {
+                                // Apply geometry WITHOUT touching PM
+                                if (f.geometry.type === 'Point') {
+                                    const c = f.geometry.coordinates as number[]
+                                    ;(layer as any)?.setLatLng?.([c[1], c[0]])
+                                } else if (f.geometry.type === 'LineString' || f.geometry.type === 'Polygon') {
+                                    const coords = L.GeoJSON.coordsToLatLngs(
+                                        f.geometry.coordinates,
+                                        f.geometry.type === 'Polygon' ? 1 : 0
+                                    )
+                                    ;(layer as any)?.setLatLngs?.(coords as any)
+                                } else if (f.geometry.type === 'MultiPolygon') {
+                                    const coords = L.GeoJSON.coordsToLatLngs(f.geometry.coordinates, 2)
+                                    ;(layer as any)?.setLatLngs?.(coords as any)
+                                } else if (f.geometry.type === 'MultiLineString') {
+                                    const coords = L.GeoJSON.coordsToLatLngs(f.geometry.coordinates, 1)
+                                    ;(layer as any)?.setLatLngs?.(coords as any)
+                                }
+
+                                lastSyncedGeometry.current.set(f.id, geoKey)
+                            } catch (geoErr) {
+                                console.warn('[useGeoman] Geometry sync failed for', f.id, geoErr)
+                            }
+                        } else if (geomanEditedIds.current.has(f.id)) {
+                            geomanEditedIds.current.delete(f.id)
+                            lastSyncedGeometry.current.set(f.id, geoKey)
+                        }
+
+                        // Apply styling based on selection
+                        try {
+                            const style = getAdvancedStyle(f.featureClass, f.metadata, f.style)
+                            const isLine = f.featureClass === 'road' || f.featureClass === 'river'
+
+                            const styleObj: any = {
+                                color: isSelected ? '#ff4500' : style.color,
+                                fillColor: isLine ? 'transparent' : style.fillColor,
+                                fillOpacity: isLine ? 0 : (isSelected ? 0.8 : style.fillOpacity),
+                                weight: isSelected ? Math.max(style.weight + 3, 5) : style.weight,
+                                fill: !isLine
+                            }
+                            if (style.dashArray) {
+                                styleObj.dashArray = style.dashArray
+                            }
+                            ;(layer as L.Path)?.setStyle?.(styleObj)
+                        } catch (styleErr) {
+                            console.warn('[useGeoman] setStyle failed for feature', f.id, styleErr)
+                        }
+
+                        // Bring selected to front
+                        if (isSelected) {
+                            try {
+                                ;(layer as L.Path)?.bringToFront?.()
+                            } catch (e) {
+                                // Ignore bringToFront errors
+                            }
+                        }
+
+                        // SIMPLIFIED PM MANAGEMENT:
+                        // ONLY enable PM on the PRIMARY selected layer in edit mode
+                        // NEVER disable PM or manage it on any other layer
+                        if (isPrimarySelected && currentTool === 'edit') {
+                            try {
+                                const pmLayer = (layer as any)?.pm
+                                if (pmLayer) {
+                                    const isAlreadyEnabled = pmLayer.enabled?.() === true
+                                    if (!isAlreadyEnabled) {
+                                        pmLayer.enable({
+                                            allowSelfIntersection: false,
+                                            preventMarkerRemoval: false,
+                                            snappable: true,
+                                        })
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('[useGeoman] Failed to enable pm for primary', f.id, e)
+                            }
+                        }
+                        // For all other layers, DO NOT touch PM at all
+                        // This prevents Geoman listener conflicts
+                    }
+                } catch (err) {
+                    console.warn('[useGeoman] Feature sync error for', f.id, err)
                 }
-
-                // Disable geoman on non-selected layers BEFORE setting style
-                // (pm.disable() can reset styles, so we must disable first then apply our style)
-                if ((layer as any).pm && !isSelected) {
-                    (layer as any).pm.disable()
-                }
-
-                (layer as L.Path).setStyle({
-                    color: isSelected ? '#ff4500' : style.color,
-                    fillColor: isLine ? 'transparent' : style.fillColor,
-                    fillOpacity: isLine ? 0 : (isSelected ? 0.8 : style.fillOpacity),
-                    weight: isSelected ? Math.max(style.weight + 3, 5) : style.weight,
-                    dashArray: undefined,
-                    fill: !isLine
-                })
-                if (isSelected) (layer as L.Path).bringToFront()
-
-                // Enable geoman edit on selected layer in edit mode (AFTER style is set)
-                if (isSelected && currentTool === 'edit' && (layer as any).pm && !(layer as any).pm?.enabled()) {
-                    (layer as any).pm.enable({
-                        allowSelfIntersection: false,
-                        preventMarkerRemoval: false,
-                        snappable: true,
-                    })
-                }
-            }
-        })
-
-        // Disable geoman on non-feature layers (safety cleanup)
-        if (currentTool !== 'edit' || !selectedFeatureId) {
-            featureIdToLayer.current.forEach((layer) => {
-                if ((layer as any).pm?.enabled()) (layer as any).pm.disable()
             })
+        } catch (err) {
+            console.error('[useGeoman] Sync effect error:', err)
         }
-    }, [map, features, selectedFeatureId, currentTool])
+    }, [map, features, selectedFeatureId, selectedFeatureIds, currentTool])
 
     // ─── Map Refresh Event ──────────────────────────────────
     useEffect(() => {
