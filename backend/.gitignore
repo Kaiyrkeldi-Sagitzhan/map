@@ -1,5 +1,4 @@
-# Env
-.env
+
 
 # Large files
 *.gpkg
@@ -10,8 +9,7 @@ postgres_data/
 
 # Go binaries
 bin/
-map-service/map-service
-auth-service/auth-service
+
 
 # OS
 .DS_Store

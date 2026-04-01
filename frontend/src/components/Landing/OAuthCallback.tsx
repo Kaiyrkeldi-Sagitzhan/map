@@ -1,39 +1,38 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { apiService } from '../../services/api'
 import { Loader2 } from 'lucide-react'
 
 export default function OAuthCallback() {
   const navigate = useNavigate()
+  const { setAuthData } = useAuth()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const handleCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search)
       const code = urlParams.get('code')
-      const state = urlParams.get('state')
 
       if (!code) {
         setError('Missing authorization code')
         return
       }
 
-      if (state !== 'google_oauth') {
-        setError('Invalid state parameter')
-        return
-      }
-
       try {
+        console.log('Starting OAuth callback')
         const redirectUri = `${window.location.origin}/auth/google/callback`
+        console.log('Calling API with code:', code, 'redirectUri:', redirectUri)
         const response = await apiService.handleGoogleCallback(code, redirectUri)
-        localStorage.setItem('token', response.token)
-        localStorage.setItem('user', JSON.stringify(response.user))
+        console.log('API response:', response)
+        setAuthData(response.token, response.user)
+        console.log('Auth data set, navigating')
         // Role-based redirect
         const role = response.user.role
         if (role === 'admin' || role === 'expert') {
-          navigate('/editor')
+          window.location.href = '/editor'
         } else {
-          navigate('/map')
+          window.location.href = '/map'
         }
       } catch (err) {
         console.error('OAuth callback error:', err)
@@ -42,7 +41,7 @@ export default function OAuthCallback() {
     }
 
     handleCallback()
-  }, [navigate])
+  }, [navigate, setAuthData])
 
   if (error) {
     return (

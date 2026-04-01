@@ -17,19 +17,22 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidRole        = errors.New("invalid role")
+	ErrEmailNotVerified   = errors.New("email not verified")
 )
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepository *repository.UserRepository
-	tokenManager   *jwt.TokenManager
+	userRepository    *repository.UserRepository
+	tokenManager      *jwt.TokenManager
+	verificationSvc   *VerificationService
 }
 
 // NewAuthService creates a new AuthService instance
-func NewAuthService(userRepo *repository.UserRepository, tokenManager *jwt.TokenManager) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, tokenManager *jwt.TokenManager, verificationSvc *VerificationService) *AuthService {
 	return &AuthService{
-		userRepository: userRepo,
-		tokenManager:   tokenManager,
+		userRepository:  userRepo,
+		tokenManager:    tokenManager,
+		verificationSvc: verificationSvc,
 	}
 }
 
@@ -47,6 +50,11 @@ func userToDTO(user *model.User) dto.UserDTO {
 
 // Register creates a new user account
 func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*dto.AuthResponse, error) {
+	// Check if email is verified
+	if !s.verificationSvc.IsVerified(req.Email) {
+		return nil, ErrEmailNotVerified
+	}
+
 	role := req.Role
 	if role == "" {
 		role = model.RoleUser

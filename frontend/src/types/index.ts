@@ -193,4 +193,5 @@ export interface AuthContextType {
   logout: () => void;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   updateUser: (user: User) => void;
+  setAuthData: (token: string, user: User) => void;
 }
