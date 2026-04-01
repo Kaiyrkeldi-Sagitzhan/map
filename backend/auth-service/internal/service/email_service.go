@@ -29,11 +29,19 @@ func NewEmailService(host string, port int, username, password, from string) *Em
 
 // SendVerificationCode sends a verification email with the code
 func (s *EmailService) SendVerificationCode(email, code string) error {
-	log.Printf("=== VERIFICATION CODE FOR %s ===\n", email)
+	log.Printf("=== SENDING VERIFICATION CODE TO %s ===\n", email)
 	log.Printf("Code: %s\n", code)
+	log.Printf("SMTP Config - Host: %s, Port: %d, From: %s\n", s.smtpHost, s.smtpPort, s.smtpFrom)
 	log.Printf("=====================================\n")
 
-	return s.sendEmail(email, "Your FreshMap Verification Code", s.buildVerificationEmail(code))
+	err := s.sendEmail(email, "Your FreshMap Verification Code", s.buildVerificationEmail(code))
+	if err != nil {
+		log.Printf("Failed to send verification email to %s: %v\n", email, err)
+		return err
+	}
+
+	log.Printf("Verification email sent successfully to %s\n", email)
+	return nil
 }
 
 // sendEmail sends an actual email using SMTP

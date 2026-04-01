@@ -54,6 +54,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			status = http.StatusBadRequest
 			errorMsg = "validation_error"
 			message = "Invalid role specified"
+		case "email not verified":
+			status = http.StatusBadRequest
+			errorMsg = "email_not_verified"
+			message = "Please verify your email before registering"
 		}
 
 		c.JSON(status, dto.ErrorResponse{
