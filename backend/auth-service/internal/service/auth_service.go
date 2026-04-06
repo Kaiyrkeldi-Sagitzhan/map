@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"auth-service/internal/dto"
@@ -22,17 +24,19 @@ var (
 
 // AuthService handles authentication business logic
 type AuthService struct {
-	userRepository    *repository.UserRepository
-	tokenManager      *jwt.TokenManager
-	verificationSvc   *VerificationService
+	userRepository  *repository.UserRepository
+	tokenManager    *jwt.TokenManager
+	verificationSvc *VerificationService
+	emailSvc        *EmailService
 }
 
 // NewAuthService creates a new AuthService instance
-func NewAuthService(userRepo *repository.UserRepository, tokenManager *jwt.TokenManager, verificationSvc *VerificationService) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, tokenManager *jwt.TokenManager, verificationSvc *VerificationService, emailSvc *EmailService) *AuthService {
 	return &AuthService{
 		userRepository:  userRepo,
 		tokenManager:    tokenManager,
 		verificationSvc: verificationSvc,
+		emailSvc:        emailSvc,
 	}
 }
 
@@ -272,31 +276,40 @@ func (s *AuthService) AdminCreateUser(ctx context.Context, req *dto.AdminCreateU
 }
 
 // AdminUpdateUser updates any user (admin only)
-func (s *AuthService) AdminUpdateUser(ctx context.Context, userID uuid.UUID, req *dto.AdminUpdateUserRequest) (*dto.UserDTO, error) {
+func (s *AuthService) AdminUpdateUser(ctx context.Context, userID uuid.UUID, req *dto.AdminUpdateUserRequest, adminEmail string) (*dto.UserDTO, error) {
 	user, err := s.userRepository.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	if req.Email != "" {
+	// Track changes for notification
+	var changes []string
+
+	if req.Email != "" && req.Email != user.Email {
+		changes = append(changes, "Email address changed")
 		user.Email = req.Email
 	}
-	if req.Role != "" {
+	if req.Role != "" && req.Role != user.Role {
 		if !model.IsValidRole(req.Role) {
 			return nil, ErrInvalidRole
 		}
+		changes = append(changes, fmt.Sprintf("Role changed from %s to %s", user.Role, req.Role))
 		user.Role = req.Role
 	}
-	if req.FirstName != "" {
+	if req.FirstName != "" && req.FirstName != user.FirstName {
+		changes = append(changes, fmt.Sprintf("First name changed from '%s' to '%s'", user.FirstName, req.FirstName))
 		user.FirstName = req.FirstName
 	}
-	if req.LastName != "" {
+	if req.LastName != "" && req.LastName != user.LastName {
+		changes = append(changes, fmt.Sprintf("Last name changed from '%s' to '%s'", user.LastName, req.LastName))
 		user.LastName = req.LastName
 	}
-	if req.Nickname != "" {
+	if req.Nickname != "" && req.Nickname != user.Nickname {
+		changes = append(changes, fmt.Sprintf("Nickname changed from '%s' to '%s'", user.Nickname, req.Nickname))
 		user.Nickname = req.Nickname
 	}
 	if req.Password != "" {
+		changes = append(changes, "Password changed")
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, err
@@ -311,12 +324,37 @@ func (s *AuthService) AdminUpdateUser(ctx context.Context, userID uuid.UUID, req
 		return nil, err
 	}
 
+	// Send email notification if there were changes
+	if len(changes) > 0 && s.emailSvc != nil {
+		go func() {
+			err := s.emailSvc.SendUserUpdateNotification(user.Email, adminEmail, changes)
+			if err != nil {
+				log.Printf("Failed to send user update notification: %v", err)
+			}
+		}()
+	}
+
 	result := userToDTO(user)
 	return &result, nil
 }
 
 // AdminDeleteUser deletes a user (admin only)
-func (s *AuthService) AdminDeleteUser(ctx context.Context, userID uuid.UUID) error {
+func (s *AuthService) AdminDeleteUser(ctx context.Context, userID uuid.UUID, adminEmail string) error {
+	user, err := s.userRepository.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Send email notification before deletion
+	if s.emailSvc != nil {
+		go func() {
+			err := s.emailSvc.SendUserDeletionNotification(user.Email, adminEmail)
+			if err != nil {
+				log.Printf("Failed to send user deletion notification: %v", err)
+			}
+		}()
+	}
+
 	return s.userRepository.Delete(ctx, userID)
 }
 

@@ -304,7 +304,26 @@ func (h *AuthHandler) AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.AdminUpdateUser(c.Request.Context(), userID, &req)
+	// Get admin email from context
+	adminEmail, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Admin email not found in context",
+		})
+		return
+	}
+
+	adminEmailStr, ok := adminEmail.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid admin email format",
+		})
+		return
+	}
+
+	user, err := h.authService.AdminUpdateUser(c.Request.Context(), userID, &req, adminEmailStr)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -341,7 +360,26 @@ func (h *AuthHandler) AdminDeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = h.authService.AdminDeleteUser(c.Request.Context(), userID)
+	// Get admin email from context
+	adminEmail, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Admin email not found in context",
+		})
+		return
+	}
+
+	adminEmailStr, ok := adminEmail.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid admin email format",
+		})
+		return
+	}
+
+	err = h.authService.AdminDeleteUser(c.Request.Context(), userID, adminEmailStr)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"

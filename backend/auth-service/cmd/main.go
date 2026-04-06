@@ -69,7 +69,7 @@ func main() {
 	verificationService := service.NewVerificationService(emailService)
 
 	// Initialize services
-	authService := service.NewAuthService(userRepository, tokenManager, verificationService)
+	authService := service.NewAuthService(userRepository, tokenManager, verificationService, emailService)
 
 	// Google OAuth service
 	googleOAuthService := service.NewGoogleOAuthService(
