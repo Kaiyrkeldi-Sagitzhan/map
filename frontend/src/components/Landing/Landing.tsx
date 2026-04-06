@@ -46,6 +46,21 @@ export default function Landing() {
     })
   }, [])
 
+  /* ── OAuth message handler ────────────────────────────────── */
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data.type === 'oauth_success') {
+        localStorage.setItem('token', event.data.token)
+        localStorage.setItem('user', JSON.stringify(event.data.user))
+        // Force re-render by updating state
+        window.location.reload()
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
   /* ── Title card 3D parallax on mouse ─────────────────────── */
   useEffect(() => {
     const card = titleCardRef.current

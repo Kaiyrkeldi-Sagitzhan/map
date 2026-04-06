@@ -53,8 +53,8 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     setError('')
     try {
       await apiService.verifyCode(email, verificationCode)
-      await register(email, password)
       onClose()
+      await register(email, password)
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка верификации')
     } finally {
@@ -68,8 +68,8 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     setLoading(true)
     try {
       if (mode === 'login') {
-        await login(email, password)
         onClose()
+        await login(email, password)
       } else if (mode === 'register') {
         if (password !== confirmPassword) {
           setError('Пароли не совпадают')
@@ -91,7 +91,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     try {
       const redirectUri = `${window.location.origin}/auth/google/callback`
       const { url } = await apiService.getGoogleAuthURL(redirectUri)
-      window.location.href = url
+      window.open(url, '_blank', 'width=500,height=600')
     } catch {
       setError('Ошибка при подключении Google')
     }

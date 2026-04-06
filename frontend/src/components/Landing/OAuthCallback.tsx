@@ -24,15 +24,25 @@ export default function OAuthCallback() {
         const redirectUri = `${window.location.origin}/auth/google/callback`
         console.log('Calling API with code:', code, 'redirectUri:', redirectUri)
         const response = await apiService.handleGoogleCallback(code, redirectUri)
-        console.log('API response:', response)
-        setAuthData(response.token, response.user)
-        console.log('Auth data set, navigating')
-        // Role-based redirect
-        const role = response.user.role
-        if (role === 'admin' || role === 'expert') {
-          window.location.href = '/editor'
+        localStorage.setItem('token', response.token)
+        localStorage.setItem('user', JSON.stringify(response.user))
+
+        if (window.opener) {
+          // Send message to parent window
+          window.opener.postMessage({
+            type: 'oauth_success',
+            token: response.token,
+            user: response.user
+          }, window.location.origin)
+          window.close()
         } else {
-          window.location.href = '/map'
+          // Normal navigation
+          const role = response.user.role
+          if (role === 'admin' || role === 'expert') {
+            navigate('/editor')
+          } else {
+            navigate('/map')
+          }
         }
       } catch (err) {
         console.error('OAuth callback error:', err)
