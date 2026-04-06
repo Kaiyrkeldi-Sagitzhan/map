@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { apiService } from '../../services/api'
 import { X, Mail, Lock, Loader2 } from 'lucide-react'
@@ -9,15 +9,53 @@ interface Props {
   onSwitchMode: (mode: 'login' | 'register' | 'verify') => void
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; confirmPassword?: string }>({})
   const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const { login, register } = useAuth()
+
+  const trimmedEmail = email.trim()
+  const isEmailValid = EMAIL_REGEX.test(trimmedEmail)
+  const passwordChecks = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasDigit: /\d/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+  }
+  const isPasswordStrong = Object.values(passwordChecks).every(Boolean)
+
+  const getRegistrationValidationErrors = (requireConfirm: boolean) => {
+    const errors: { email?: string; password?: string; confirmPassword?: string } = {}
+
+    if (!trimmedEmail) errors.email = 'Введите email'
+    else if (!isEmailValid) errors.email = 'Введите корректный email'
+
+    if (!isPasswordStrong) {
+      const missing: string[] = []
+      if (!passwordChecks.minLength) missing.push('минимум 8 символов')
+      if (!passwordChecks.hasUppercase) missing.push('хотя бы одну заглавную букву')
+      if (!passwordChecks.hasLowercase) missing.push('хотя бы одну строчную букву')
+      if (!passwordChecks.hasDigit) missing.push('хотя бы одну цифру')
+      if (!passwordChecks.hasSpecial) missing.push('хотя бы один спецсимвол')
+
+      errors.password = `Добавьте: ${missing.join(', ')}`
+    }
+
+    if (requireConfirm && password !== confirmPassword) {
+      errors.confirmPassword = 'Пароли не совпадают'
+    }
+
+    return errors
+  }
 
   // Countdown timer for resend code
   useEffect(() => {
@@ -27,24 +65,40 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     }
   }, [countdown])
 
-  const handleSendCode = async () => {
-    if (!email) {
-      setError('Введите email')
-      return
+  const handleSendCode = async (): Promise<boolean> => {
+    setFieldErrors({})
+
+    if (!trimmedEmail) {
+      setFieldErrors({ email: 'Введите email' })
+      return false
+    }
+    if (!isEmailValid) {
+      setFieldErrors({ email: 'Введите корректный email' })
+      return false
     }
     setLoading(true)
     setError('')
     try {
-      await apiService.sendVerificationCode(email)
+      await apiService.sendVerificationCode(trimmedEmail)
       setCountdown(60)
+      return true
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка отправки кода')
+      return false
     } finally {
       setLoading(false)
     }
   }
 
   const handleVerifyAndRegister = async () => {
+    const validationErrors = getRegistrationValidationErrors(true)
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      return
+    }
+
+    setFieldErrors({})
+
     if (!verificationCode || verificationCode.length !== 6) {
       setError('Введите 6-значный код')
       return
@@ -52,8 +106,8 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     setLoading(true)
     setError('')
     try {
-      await apiService.verifyCode(email, verificationCode)
-      await register(email, password)
+      await apiService.verifyCode(trimmedEmail, verificationCode)
+      await register(trimmedEmail, password)
       onClose()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка верификации')
@@ -62,28 +116,35 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
+    setFieldErrors({})
+
     try {
       if (mode === 'login') {
-        await login(email, password)
+        setLoading(true)
+        await login(trimmedEmail, password)
         onClose()
       } else if (mode === 'register') {
-        if (password !== confirmPassword) {
-          setError('Пароли не совпадают')
-          setLoading(false)
+        const validationErrors = getRegistrationValidationErrors(true)
+        if (Object.keys(validationErrors).length > 0) {
+          setFieldErrors(validationErrors)
           return
         }
+
         // Start verification flow
-        await handleSendCode()
-        onSwitchMode('verify')
+        const sent = await handleSendCode()
+        if (sent) {
+          onSwitchMode('verify')
+        }
       }
     } catch {
       setError(mode === 'login' ? 'Неверная почта или пароль' : 'Ошибка регистрации')
     } finally {
-      setLoading(false)
+      if (mode === 'login') {
+        setLoading(false)
+      }
     }
   }
 
@@ -186,7 +247,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
           </div>
         ) : (
           // Login or Register form
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-[0.2em] ml-4">
                 Электронная почта
@@ -198,12 +259,19 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setEmail(e.target.value)
+                    if (fieldErrors.email) {
+                      setFieldErrors((prev: { email?: string; password?: string; confirmPassword?: string }) => ({ ...prev, email: undefined }))
+                    }
+                  }}
                   placeholder="identity@freshmap.team"
                   className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                 />
               </div>
+              {mode === 'register' && fieldErrors.email && (
+                <p className="mt-2 ml-4 text-[10px] text-red-400 uppercase tracking-widest">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div>
@@ -217,13 +285,19 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setPassword(e.target.value)
+                    if (fieldErrors.password) {
+                      setFieldErrors((prev: { email?: string; password?: string; confirmPassword?: string }) => ({ ...prev, password: undefined }))
+                    }
+                  }}
                   placeholder="••••••••"
-                  minLength={6}
                   className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                 />
               </div>
+              {mode === 'register' && fieldErrors.password && (
+                <p className="mt-2 ml-4 text-[10px] text-red-400 uppercase tracking-widest">{fieldErrors.password}</p>
+              )}
             </div>
 
             {mode === 'register' && (
@@ -238,13 +312,19 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
                   <input
                     type="password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      setConfirmPassword(e.target.value)
+                      if (fieldErrors.confirmPassword) {
+                        setFieldErrors((prev: { email?: string; password?: string; confirmPassword?: string }) => ({ ...prev, confirmPassword: undefined }))
+                      }
+                    }}
                     placeholder="••••••••"
-                    minLength={6}
                     className="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/5 rounded-full text-white placeholder-slate-700 focus:outline-none focus:border-[#10B981] transition-all"
                   />
                 </div>
+                {fieldErrors.confirmPassword && (
+                  <p className="mt-2 ml-4 text-[10px] text-red-400 uppercase tracking-widest">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
             )}
 
