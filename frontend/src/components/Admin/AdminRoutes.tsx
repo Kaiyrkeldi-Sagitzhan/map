@@ -6,9 +6,10 @@ import ComplaintsPage from './ComplaintsPage'
 const AdminRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<DashboardPage />} />
-      <Route path="/users" element={<UsersPage />} />
-      <Route path="/complaints" element={<ComplaintsPage />} />
+      <Route index element={<DashboardPage />} />
+      <Route path="users" element={<UsersPage />} />
+      <Route path="complaints" element={<ComplaintsPage />} />
+      <Route path="*" element={<DashboardPage />} />
     </Routes>
   )
 }

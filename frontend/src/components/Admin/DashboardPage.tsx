@@ -50,6 +50,7 @@ const DashboardPage = () => {
     color: getTypeColor(s.type),
     centroid: s.centroid,
   }))
+  const hasChartData = chartData.length > 0
 
   const handleChartClick = (item: any) => {
     if (item.centroid) {
@@ -103,6 +104,18 @@ const DashboardPage = () => {
       {statsLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="w-6 h-6 border-2 border-[#10B981] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !hasChartData ? (
+        <div
+          className="rounded-xl p-8 text-center mb-8"
+          style={{
+            background: 'rgba(10, 25, 47, 0.7)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+          }}
+        >
+          <h3 className="text-sm font-semibold text-slate-200 mb-2">Пока нет данных для диаграмм</h3>
+          <p className="text-xs text-slate-500">Статистика появится после загрузки объектов на карту.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-6 mb-8">

@@ -5,24 +5,42 @@ import type { User, AuthContextType, UpdateProfileRequest } from '../types'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function getStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem('user')
+    if (!raw) return null
+    return JSON.parse(raw) as User
+  } catch {
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token)
-  const [isAdmin, setIsAdmin] = useState<boolean>(false)
-  const [isExpert, setIsExpert] = useState<boolean>(false)
-  const [canEdit, setCanEdit] = useState<boolean>(false)
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
+  const [user, setUser] = useState<User | null>(() => getStoredUser())
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('token'))
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => getStoredUser()?.role === 'admin')
+  const [isExpert, setIsExpert] = useState<boolean>(() => getStoredUser()?.role === 'expert')
+  const [canEdit, setCanEdit] = useState<boolean>(() => {
+    const storedUser = getStoredUser()
+    return storedUser?.role === 'admin' || storedUser?.role === 'expert'
+  })
   const navigate = useNavigate()
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser && token) {
-      const parsedUser = JSON.parse(storedUser)
+    const parsedUser = getStoredUser()
+    if (parsedUser && token) {
       setUser(parsedUser)
       setIsAdmin(parsedUser.role === 'admin')
       setIsExpert(parsedUser.role === 'expert')
       setCanEdit(parsedUser.role === 'admin' || parsedUser.role === 'expert')
       setIsAuthenticated(true)
+    } else {
+      setUser(null)
+      setIsAdmin(false)
+      setIsExpert(false)
+      setCanEdit(false)
+      setIsAuthenticated(false)
     }
   }, [token])
 
@@ -92,6 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(newUser))
   }
 
+  const setAuthData = (token: string, user: User) => {
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    setToken(token)
+    setUser(user)
+    setIsAdmin(user.role === 'admin')
+    setIsExpert(user.role === 'expert')
+    setCanEdit(user.role === 'admin' || user.role === 'expert')
+    setIsAuthenticated(true)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -106,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         updateProfile,
         updateUser,
+        setAuthData,
       }}
     >
       {children}

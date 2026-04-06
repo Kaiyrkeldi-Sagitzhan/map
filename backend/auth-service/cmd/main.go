@@ -56,9 +56,6 @@ func main() {
 	// Initialize repository
 	userRepository := repository.NewUserRepository(db)
 
-	// Initialize services
-	authService := service.NewAuthService(userRepository, tokenManager)
-
 	// Email service
 	emailService := service.NewEmailService(
 		cfg.SMTPHost,
@@ -71,11 +68,15 @@ func main() {
 	// Verification service
 	verificationService := service.NewVerificationService(emailService)
 
+	// Initialize services
+	authService := service.NewAuthService(userRepository, tokenManager, verificationService, emailService)
+
 	// Google OAuth service
 	googleOAuthService := service.NewGoogleOAuthService(
 		cfg.GoogleClientID,
 		cfg.GoogleClientSecret,
 		cfg.GoogleRedirectURL,
+		cfg.GoogleAllowedRedirectURLs,
 		userRepository,
 		tokenManager,
 	)

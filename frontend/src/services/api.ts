@@ -106,14 +106,19 @@ class ApiService {
 
   // ========== Google OAuth ==========
 
-  async getGoogleAuthURL(): Promise<{ url: string }> {
-    const response = await this.authClient.get<{ url: string }>('/api/auth/google/url');
+  async getGoogleAuthURL(redirectUri?: string): Promise<{ url: string }> {
+    const response = await this.authClient.get<{ url: string }>('/api/auth/google/url', {
+      params: redirectUri ? { redirect_uri: redirectUri } : undefined,
+    });
     return response.data;
   }
 
-  async handleGoogleCallback(code: string): Promise<AuthResponse> {
+  async handleGoogleCallback(code: string, redirectUri?: string): Promise<AuthResponse> {
     const response = await this.authClient.get<AuthResponse>('/api/auth/google/callback', {
-      params: { code }
+      params: {
+        code,
+        ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      }
     });
     return response.data;
   }

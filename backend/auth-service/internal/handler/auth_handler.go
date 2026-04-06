@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"auth-service/internal/dto"
 	"auth-service/internal/service"
@@ -53,6 +54,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			status = http.StatusBadRequest
 			errorMsg = "validation_error"
 			message = "Invalid role specified"
+		case "email not verified":
+			status = http.StatusBadRequest
+			errorMsg = "email_not_verified"
+			message = "Please verify your email before registering"
 		}
 
 		c.JSON(status, dto.ErrorResponse{
@@ -299,7 +304,26 @@ func (h *AuthHandler) AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.AdminUpdateUser(c.Request.Context(), userID, &req)
+	// Get admin email from context
+	adminEmail, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Admin email not found in context",
+		})
+		return
+	}
+
+	adminEmailStr, ok := adminEmail.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid admin email format",
+		})
+		return
+	}
+
+	user, err := h.authService.AdminUpdateUser(c.Request.Context(), userID, &req, adminEmailStr)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -336,7 +360,26 @@ func (h *AuthHandler) AdminDeleteUser(c *gin.Context) {
 		return
 	}
 
-	err = h.authService.AdminDeleteUser(c.Request.Context(), userID)
+	// Get admin email from context
+	adminEmail, exists := c.Get("email")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Admin email not found in context",
+		})
+		return
+	}
+
+	adminEmailStr, ok := adminEmail.(string)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Invalid admin email format",
+		})
+		return
+	}
+
+	err = h.authService.AdminDeleteUser(c.Request.Context(), userID, adminEmailStr)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -472,7 +515,15 @@ func (h *AuthHandler) VerifyCode(c *gin.Context) {
 // GetGoogleAuthURL returns the Google OAuth URL
 func (h *AuthHandler) GetGoogleAuthURL(c *gin.Context) {
 	state := "google_oauth"
-	url := h.googleOAuthSvc.GetAuthURL(state)
+	redirectURI := c.Query("redirect_uri")
+	if redirectURI == "" {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		if origin != "" {
+			redirectURI = strings.TrimRight(origin, "/") + "/auth/google/callback"
+		}
+	}
+
+	url := h.googleOAuthSvc.GetAuthURL(state, redirectURI)
 	c.JSON(http.StatusOK, dto.GoogleOAuthURLResponse{
 		URL: url,
 	})
@@ -489,7 +540,8 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.googleOAuthSvc.HandleGoogleCallback(c.Request.Context(), code)
+	redirectURI := c.Query("redirect_uri")
+	resp, err := h.googleOAuthSvc.HandleGoogleCallback(c.Request.Context(), code, redirectURI)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "oauth_error",

@@ -31,7 +31,8 @@ docker compose up -d
 
 http://localhost:8080
 
-**IMPORTANT**: Open `localhost:8080`, NOT `localhost:3000`. Port 8080 — это API Gateway (nginx), который обслуживает и фронтенд, и API. Port 3000 — только статика без API.
+**IMPORTANT**: Рекомендуется открывать `localhost:8080` (единая точка входа через API Gateway).
+`localhost:3000` тоже поддерживается: frontend nginx проксирует `/api/auth`, `/api/map`, `/api/admin` во внутренние сервисы.
 
 ### Default admin account
 

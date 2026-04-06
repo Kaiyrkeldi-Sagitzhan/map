@@ -2,23 +2,19 @@ services:
   # PostgreSQL with PostGIS for geospatial data
   postgres:
     image: postgis/postgis:15-3.3
-    container_name: kzmap-postgres
-    command: postgres -c shared_buffers=512MB -c work_mem=64MB -c effective_cache_size=1GB -c random_page_cost=1.1
     environment:
       POSTGRES_DB: kzmap
       POSTGRES_USER: kzmap_user
       POSTGRES_PASSWORD: kzmap_password
-      POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
-      - ./database/03-init_data.sh:/docker-entrypoint-initdb.d/03-init_data.sh
-      - ./database/data_dump.sql.gz.bak:/docker-entrypoint-initdb.d/data_dump.sql.gz.bak
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/database/migrations:/docker-entrypoint-initdb.d/02-migrations
+      - ./backend/database/03-init_data.sh:/docker-entrypoint-initdb.d/03-init_data.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kzmap_user -d kzmap"]
+      test: [ "CMD-SHELL", "pg_isready -U kzmap_user -d kzmap" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,7 +26,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: kzmap-redis
-    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
     ports:
       - "6380:6379"
     networks:
@@ -45,7 +40,7 @@ services:
   # Auth Service (Go + Gin)
   auth-service:
     build:
-      context: ./auth-service
+      context: ./backend/auth-service
       dockerfile: Dockerfile
     container_name: kzmap-auth-service
     environment:
@@ -58,14 +53,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
       # Google OAuth
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-802334362365-0nuf4kqu0l3lc78kldnalqell9ddop88.apps.googleusercontent.com}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
-      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:3000/auth/google/callback}
+      GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URL: http://localhost:3000/auth/google/callback
       # SMTP (for email verification)
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-adil.groud@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-wypg eorn rqha fcxi}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: adil.groud@gmail.com
+      SMTP_PASSWORD: ezah cubj vbro lzvl
       SMTP_FROM: noreply@freshmap.team
     ports:
       - "8081:8081"
@@ -84,7 +79,7 @@ services:
   # Map Service (Go + Gin)
   map-service:
     build:
-      context: ./map-service
+      context: ./backend/map-service
       dockerfile: Dockerfile
     container_name: kzmap-map-service
     environment:
@@ -115,7 +110,7 @@ services:
   # Frontend (React + Vite)
   frontend:
     build:
-      context: ../frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: kzmap-frontend
     environment:
@@ -138,7 +133,7 @@ services:
     image: nginx:alpine
     container_name: kzmap-api-gateway
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
     depends_on:
@@ -157,7 +152,7 @@ services:
     image: postgis/postgis:15-3.3
     container_name: kzmap-init-db
     volumes:
-      - .:/app
+      - ./backend:/app
     working_dir: /app
     environment:
       PGPASSWORD: kzmap_password
@@ -174,8 +169,6 @@ services:
         echo 'Database empty. Running migrations and import...'
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
         psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql
         ./load_all_gpkg.sh
       else
         echo 'Database already initialized.'
