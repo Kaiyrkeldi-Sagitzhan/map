@@ -32,8 +32,6 @@ interface ViewerState {
   // Selected feature
   selectedFeature: ViewerFeature | null
   selectedFeatureId: string | null
-  selectedFeatures: ViewerFeature[]
-  selectedFeatureIds: string[]
   serverHistory: ServerHistoryEntry[]
   // Highlight overlay (GeoJSON to show on map)
   highlightGeometry: any | null
@@ -57,9 +55,6 @@ interface ViewerState {
 
   // Actions
   setSelectedFeature: (feature: ViewerFeature | null) => void
-  setPrimarySelectedFeature: (feature: ViewerFeature | null) => void
-  toggleSelectedFeature: (feature: ViewerFeature) => void
-  clearSelection: () => void
   setSelectedFeatureId: (id: string | null) => void
   setMouseCoords: (coords: MouseCoords | null) => void
   setSearchResults: (results: ViewerFeature[]) => void
@@ -80,8 +75,6 @@ const ALL_LAYERS = new Set(['lake', 'river', 'forest', 'road', 'building', 'city
 export const useViewerStore = create<ViewerState>((set) => ({
   selectedFeature: null,
   selectedFeatureId: null,
-  selectedFeatures: [],
-  selectedFeatureIds: [],
   serverHistory: [],
   highlightGeometry: null,
   highlightStyle: null,
@@ -97,68 +90,8 @@ export const useViewerStore = create<ViewerState>((set) => ({
   setSelectedFeature: (feature) => set((_s) => ({
     selectedFeature: feature,
     selectedFeatureId: feature?.id || null,
-    selectedFeatures: feature ? [feature] : [],
-    selectedFeatureIds: feature ? [feature.id] : [],
     ...(feature ? {} : { serverHistory: [], highlightGeometry: null, highlightStyle: null }),
   })),
-  setPrimarySelectedFeature: (feature) => set((state) => {
-    if (!feature) {
-      return {
-        selectedFeature: null,
-        selectedFeatureId: null,
-      }
-    }
-
-    const featureKey = feature.backendId || feature.id
-    const existsInMulti = state.selectedFeatures.some((f) => (f.backendId || f.id) === featureKey)
-
-    if (!existsInMulti) {
-      return {
-        selectedFeature: feature,
-        selectedFeatureId: feature.id,
-        selectedFeatures: [feature],
-        selectedFeatureIds: [feature.id],
-      }
-    }
-
-    return {
-      selectedFeature: feature,
-      selectedFeatureId: feature.id,
-    }
-  }),
-  toggleSelectedFeature: (feature) => set((state) => {
-    const featureKey = feature.backendId || feature.id
-    const exists = state.selectedFeatures.some((f) => (f.backendId || f.id) === featureKey)
-
-    if (exists) {
-      const nextSelectedFeatures = state.selectedFeatures.filter((f) => (f.backendId || f.id) !== featureKey)
-      const nextPrimary = nextSelectedFeatures[nextSelectedFeatures.length - 1] || null
-      return {
-        selectedFeatures: nextSelectedFeatures,
-        selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
-        selectedFeature: nextPrimary,
-        selectedFeatureId: nextPrimary?.id || null,
-        ...(nextPrimary ? {} : { serverHistory: [], highlightGeometry: null, highlightStyle: null }),
-      }
-    }
-
-    const nextSelectedFeatures = [...state.selectedFeatures, feature]
-    return {
-      selectedFeatures: nextSelectedFeatures,
-      selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
-      selectedFeature: feature,
-      selectedFeatureId: feature.id,
-    }
-  }),
-  clearSelection: () => set({
-    selectedFeature: null,
-    selectedFeatureId: null,
-    selectedFeatures: [],
-    selectedFeatureIds: [],
-    serverHistory: [],
-    highlightGeometry: null,
-    highlightStyle: null,
-  }),
   setSelectedFeatureId: (id) => set({ selectedFeatureId: id }),
   setMouseCoords: (coords) => set({ mouseCoords: coords }),
   setSearchResults: (results) => set({ searchResults: results }),
@@ -198,6 +131,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
         })),
       })
     } catch (e) {
+      console.error('Failed to fetch history:', e)
       set({ serverHistory: [] })
     }
   },

@@ -48,6 +48,7 @@ export default function ViewerTextSearch() {
     const doSearch = useCallback(async (text: string, type: string) => {
         if (text.length < 2) {
             setLocalResults([])
+            clearSearchResults()
             return
         }
         setIsSearching(true)
@@ -76,6 +77,7 @@ export default function ViewerTextSearch() {
         if (debounceRef.current) clearTimeout(debounceRef.current)
         if (query.length < 2) {
             setLocalResults([])
+            clearSearchResults()
             return
         }
         debounceRef.current = setTimeout(() => {

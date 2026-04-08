@@ -22,7 +22,6 @@ const CLASS_LABELS: Record<string, string> = {
 export default function ViewerLayersPanel() {
     const selectedFeature = useViewerStore((s) => s.selectedFeature)
     const selectedFeatureId = useViewerStore((s) => s.selectedFeatureId)
-    const activeTool = useViewerStore((s) => s.activeTool)
     const serverHistory = useViewerStore((s) => s.serverHistory)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
     const setHighlight = useViewerStore((s) => s.setHighlight)
@@ -32,10 +31,10 @@ export default function ViewerLayersPanel() {
 
     // Auto-fetch history when feature is selected
     useEffect(() => {
-        if (activeTool === 'history' && (selectedFeature?.backendId || selectedFeatureId)) {
+        if (selectedFeature?.backendId || selectedFeatureId) {
             fetchFeatureHistory(selectedFeature?.backendId || selectedFeatureId!)
         }
-    }, [selectedFeatureId, activeTool, selectedFeature?.backendId, fetchFeatureHistory])
+    }, [selectedFeatureId])
 
     const handleHistoryHover = (entry: typeof serverHistory[0]) => {
         const snapshot = entry.afterSnapshot || entry.beforeSnapshot

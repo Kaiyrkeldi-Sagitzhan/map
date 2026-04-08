@@ -27,7 +27,6 @@ interface EditorState {
     // Features
     features: EditorFeature[]
     selectedFeatureId: string | null
-    selectedFeatureIds: string[]
     
     // Search results (temporary view)
     searchResults: EditorFeature[]
@@ -54,8 +53,6 @@ interface EditorState {
     setTool: (tool: DrawTool) => void
     setFeatureClass: (fc: FeatureClass) => void
     setSelectedFeature: (id: string | null) => void
-    toggleSelectedFeature: (id: string) => void
-    clearSelection: () => void
     setSelectedFeatureById: (backendId: string) => Promise<void>
     setMouseCoords: (coords: MouseCoords | null) => void
     setShowMap: (show: boolean) => void
@@ -121,7 +118,6 @@ export const useEditorStore = create<EditorState>()(
 
             features: [],
             selectedFeatureId: null,
-            selectedFeatureIds: [],
             searchResults: [],
 
             layers: [],
@@ -139,36 +135,10 @@ export const useEditorStore = create<EditorState>()(
             // ─── Tool / Class ────────────────────────────────────────
             setTool: (tool) => set({ currentTool: tool }),
             setFeatureClass: (fc) => set({ featureClass: fc }),
-            setSelectedFeature: (id) => set({
-                selectedFeatureId: id,
-                selectedFeatureIds: id ? [id] : [],
-                isGeometryDirty: false,
-            }),
-
-            toggleSelectedFeature: (id) => {
-                set((s) => {
-                    const exists = s.selectedFeatureIds.includes(id)
-                    const selectedFeatureIds = exists
-                        ? s.selectedFeatureIds.filter((fid) => fid !== id)
-                        : [...s.selectedFeatureIds, id]
-
-                    const selectedFeatureId = exists
-                        ? (selectedFeatureIds[selectedFeatureIds.length - 1] || null)
-                        : id
-
-                    return { selectedFeatureIds, selectedFeatureId, isGeometryDirty: false }
-                })
-            },
-
-            clearSelection: () => set({ selectedFeatureId: null, selectedFeatureIds: [], isGeometryDirty: false }),
+            setSelectedFeature: (id) => set({ selectedFeatureId: id, isGeometryDirty: false }),
             
             setSelectedFeatureById: async (backendId: string) => {
-                set({
-                    isLoading: true,
-                    selectedFeatureId: backendId,
-                    selectedFeatureIds: [backendId],
-                    isGeometryDirty: false,
-                })
+                set({ isLoading: true, selectedFeatureId: backendId, isGeometryDirty: false })
                 try {
                     // Automatically fetch history for this backend object
                     await get().fetchFeatureHistory(backendId)
@@ -263,7 +233,6 @@ export const useEditorStore = create<EditorState>()(
                 set((s) => ({
                     features: s.features.filter((f) => f.id !== id),
                     selectedFeatureId: s.selectedFeatureId === id ? null : s.selectedFeatureId,
-                    selectedFeatureIds: s.selectedFeatureIds.filter((fid) => fid !== id),
                 }))
                 if (before) {
                     get().pushHistory({ type: 'delete', featureId: id, before, after: null })
@@ -287,7 +256,6 @@ export const useEditorStore = create<EditorState>()(
                 set((s) => ({
                     features: s.features.filter((f) => f.id !== id),
                     selectedFeatureId: s.selectedFeatureId === id ? null : s.selectedFeatureId,
-                    selectedFeatureIds: s.selectedFeatureIds.filter((fid) => fid !== id),
                 }))
                 get().rebuildLayers()
             },
@@ -296,10 +264,6 @@ export const useEditorStore = create<EditorState>()(
                 set((s) => ({
                     features: s.features.filter((f) => f.featureClass !== fc),
                     selectedFeatureId: s.features.find(f => f.id === s.selectedFeatureId)?.featureClass === fc ? null : s.selectedFeatureId,
-                    selectedFeatureIds: s.selectedFeatureIds.filter((fid) => {
-                        const feature = s.features.find((f) => f.id === fid)
-                        return feature?.featureClass !== fc
-                    }),
                 }))
                 get().rebuildLayers()
             },
@@ -322,7 +286,7 @@ export const useEditorStore = create<EditorState>()(
                 get().rebuildLayers()
             },
             clearFeatures: () => {
-                set({ features: [], selectedFeatureId: null, selectedFeatureIds: [] })
+                set({ features: [], selectedFeatureId: null })
                 get().rebuildLayers()
             },
             
@@ -510,7 +474,6 @@ export const useEditorStore = create<EditorState>()(
                 currentTool: state.currentTool,
                 featureClass: state.featureClass,
                 selectedFeatureId: state.selectedFeatureId,
-                selectedFeatureIds: state.selectedFeatureIds,
                 showMap: state.showMap,
                 mapOpacity: state.mapOpacity,
                 features: state.features,

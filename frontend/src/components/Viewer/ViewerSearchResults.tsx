@@ -10,7 +10,6 @@ const CLASS_LABELS: Record<string, string> = {
 
 export default function ViewerSearchResults() {
     const searchResults = useViewerStore((s) => s.searchResults)
-    const activeTool = useViewerStore((s) => s.activeTool)
     const clearSearchResults = useViewerStore((s) => s.clearSearchResults)
     const setSelectedFeature = useViewerStore((s) => s.setSelectedFeature)
     const setHighlight = useViewerStore((s) => s.setHighlight)
@@ -42,9 +41,7 @@ export default function ViewerSearchResults() {
                 } catch { /* ignore */ }
             }
         }
-        if (activeTool === 'history') {
-            fetchFeatureHistory(result.backendId || result.id)
-        }
+        fetchFeatureHistory(result.backendId || result.id)
     }
 
     return (
