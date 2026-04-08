@@ -29,7 +29,9 @@ type UpdateGeoObjectRequest struct {
 
 // GeoObjectResponse represents a geo object response
 type GeoObjectResponse struct {
-	ID          uuid.UUID       `json:"id"`
+	ID          string          `json:"id"`
+	BaseID      uuid.UUID       `json:"base_id"`
+	Version     int             `json:"version"`
 	OwnerID     *uuid.UUID      `json:"owner_id,omitempty"`
 	Scope       string          `json:"scope"`
 	Type        string          `json:"type"`

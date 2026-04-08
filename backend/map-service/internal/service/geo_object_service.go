@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"map-service/internal/dto"
@@ -72,8 +74,11 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 	}
 
 	now := time.Now()
+	objID := uuid.New()
 	obj := &model.GeoObject{
-		ID:          uuid.New(),
+		ID:          objID.String(),
+		BaseID:      objID,
+		Version:     0,
 		OwnerID:     ownerID,
 		Scope:       req.Scope,
 		Type:        req.Type,
@@ -119,6 +124,8 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 
 	return &dto.GeoObjectResponse{
 		ID:          obj.ID,
+		BaseID:      obj.BaseID,
+		Version:     obj.Version,
 		OwnerID:     obj.OwnerID,
 		Scope:       obj.Scope,
 		Type:        obj.Type,
@@ -132,7 +139,7 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 }
 
 // GetByID retrieves a geo object by ID
-func (s *GeoObjectService) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool) (*dto.GeoObjectResponse, error) {
+func (s *GeoObjectService) GetByID(ctx context.Context, id string, userID uuid.UUID, isAdmin bool) (*dto.GeoObjectResponse, error) {
 	obj, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
@@ -148,6 +155,32 @@ func (s *GeoObjectService) GetByID(ctx context.Context, id uuid.UUID, userID uui
 
 	resp := toResponse(obj)
 	return &resp, nil
+}
+
+// GetAllVersionsByBaseID retrieves all versions of an object by base_id
+func (s *GeoObjectService) GetAllVersionsByBaseID(ctx context.Context, baseID uuid.UUID, userID uuid.UUID, isAdmin bool) (*dto.GeoObjectListResponse, error) {
+	objects, err := s.repo.GetAllVersionsByBaseID(ctx, baseID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by access
+	var accessible []model.GeoObjectWithGeometry
+	for _, obj := range objects {
+		if s.canAccess(&obj, userID, isAdmin) {
+			accessible = append(accessible, obj)
+		}
+	}
+
+	responses := make([]dto.GeoObjectResponse, len(accessible))
+	for i, obj := range accessible {
+		responses[i] = toResponse(&obj)
+	}
+
+	return &dto.GeoObjectListResponse{
+		Objects: responses,
+		Total:   len(responses),
+	}, nil
 }
 
 // GetAll retrieves all accessible geo objects
@@ -228,8 +261,8 @@ func (s *GeoObjectService) GetInBBox(ctx context.Context, userID uuid.UUID, isAd
 	}, nil
 }
 
-// Update updates a geo object
-func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool, req *dto.UpdateGeoObjectRequest) (*dto.GeoObjectResponse, error) {
+// Update updates a geo object by creating a new version
+func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UUID, isAdmin bool, req *dto.UpdateGeoObjectRequest) (*dto.GeoObjectResponse, error) {
 	// Get existing object
 	existing, err := s.repo.GetByID(ctx, id)
 	isNew := false
@@ -285,7 +318,9 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 		}
 
 		obj = &model.GeoObject{
-			ID:          id,
+			ID:          id.String(),
+			BaseID:      id,
+			Version:     0,
 			OwnerID:     ownerID,
 			Scope:       scope,
 			Type:        req.Type,
@@ -303,9 +338,24 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 		
 		err = s.repo.Create(ctx, obj)
 	} else {
-		// Update existing object
+		// Create new version instead of updating
+		baseID := existing.BaseID
+
+		// Get next version number
+		maxVersion, err := s.repo.GetMaxVersionForBaseID(ctx, baseID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get max version: %w", err)
+		}
+		nextVersion := maxVersion + 1
+
+		// Create new ID
+		newID := fmt.Sprintf("%s-%06d", baseID.String(), nextVersion)
+
+		// Start with existing object's data
 		obj = &model.GeoObject{
-			ID:          id,
+			ID:          newID,
+			BaseID:      baseID,
+			Version:     nextVersion,
 			OwnerID:     existing.OwnerID,
 			Scope:       existing.Scope,
 			Type:        existing.Type,
@@ -313,6 +363,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 			Description: existing.Description,
 			Metadata:    existing.Metadata,
 			Geometry:    existing.Geometry,
+			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
 
@@ -345,7 +396,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 			}
 		}
 
-		err = s.repo.Update(ctx, obj)
+		err = s.repo.Create(ctx, obj)
 	}
 
 	if err != nil {
@@ -457,6 +508,8 @@ func buildSnapshot(obj *model.GeoObjectWithGeometry) json.RawMessage {
 func toResponse(obj *model.GeoObjectWithGeometry) dto.GeoObjectResponse {
 	resp := dto.GeoObjectResponse{
 		ID:          obj.ID,
+		BaseID:      obj.BaseID,
+		Version:     obj.Version,
 		OwnerID:     obj.OwnerID,
 		Scope:       obj.Scope,
 		Type:        obj.Type,

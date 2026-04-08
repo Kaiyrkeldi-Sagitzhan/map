@@ -23,7 +23,9 @@ export default function ViewerLayersPanel() {
     const selectedFeature = useViewerStore((s) => s.selectedFeature)
     const selectedFeatureId = useViewerStore((s) => s.selectedFeatureId)
     const serverHistory = useViewerStore((s) => s.serverHistory)
+    const objectVersions = useViewerStore((s) => s.objectVersions)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
+    const fetchFeatureVersions = useViewerStore((s) => s.fetchFeatureVersions)
     const setHighlight = useViewerStore((s) => s.setHighlight)
     const clearHighlight = useViewerStore((s) => s.clearHighlight)
     const mapOpacity = useViewerStore((s) => s.mapOpacity)
@@ -131,10 +133,59 @@ export default function ViewerLayersPanel() {
                             его изменений
                         </p>
                     </div>
-                ) : serverHistory.length > 0 ? (
+                ) : (objectVersions.length > 0 || serverHistory.length > 0) ? (
                     <div className="relative pl-4 mt-2">
                         <div className="absolute left-1 top-2 bottom-2 w-px bg-gradient-to-b from-[#10B981] via-white/10 to-transparent" />
                         <div className="space-y-4">
+                            {/* Versions */}
+                            {[...objectVersions]
+                                .sort((a, b) => b.id.localeCompare(a.id)) // Sort by version (id)
+                                .map((version, idx) => {
+                                const isLatest = idx === 0
+                                return (
+                                    <div
+                                        key={version.id}
+                                        className="relative group"
+                                        onMouseEnter={() => version.geometry && setHighlight(version.geometry, { color: '#3b82f6', fillColor: '#3b82f6', weight: 4, fillOpacity: 0.25, dashArray: '8,4' })}
+                                        onMouseLeave={handleHistoryLeave}
+                                    >
+                                        <div className={`absolute -left-[15px] top-2.5 w-2 h-2 rounded-full border z-10 transition-all duration-300 ${isLatest ? 'bg-[#10B981] border-white scale-125 shadow-[0_0_10px_#10B981]' : 'bg-slate-900 border-slate-700 group-hover:bg-purple-500 group-hover:border-purple-400 group-hover:shadow-[0_0_8px_#a855f7]'}`} />
+
+                                        <div className={`p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+                                            isLatest
+                                                ? 'bg-white/10 border-[#10B981]/30 shadow-lg'
+                                                : 'bg-white/[0.03] border-transparent hover:bg-white/[0.08] hover:border-purple-500/30'
+                                        }`}
+                                            onClick={() => version.geometry && setHighlight(version.geometry, { color: '#f59e0b', fillColor: '#f59e0b', weight: 4, fillOpacity: 0.3, dashArray: '6,6' })}
+                                        >
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className={`text-[8px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-purple-500/10 text-purple-400`}>
+                                                    Версия {version.id.split('-').pop() || '0'}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {version.geometry && (
+                                                        <ZoomIn size={10} className="text-slate-700 group-hover:text-purple-400 transition-colors" />
+                                                    )}
+                                                    <span className="text-[9px] text-slate-500 font-mono">{new Date(version.created_at || '').toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] font-medium text-slate-200 leading-snug">{version.name}</p>
+
+                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                                                <span className={`text-[8px] uppercase font-bold tracking-wider ${isLatest ? 'text-[#10B981]' : 'text-slate-600'}`}>
+                                                    {isLatest ? 'Текущая версия' : `Версия ${version.id.split('-').pop() || '0'}`}
+                                                </span>
+                                                {version.geometry && !isLatest && (
+                                                    <span className="text-[8px] text-purple-400/50 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        Нажмите для просмотра
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                            {/* History */}
                             {[...serverHistory]
                                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                                 .map((entry, idx) => {
@@ -201,3 +252,52 @@ export default function ViewerLayersPanel() {
         </div>
     )
 }
+                                                : 'bg-white/[0.03] border-transparent hover:bg-white/[0.08] hover:border-blue-500/30'
+                                        }`}
+                                            onClick={() => hasSnapshot && handleHistoryClick(entry)}
+                                        >
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <span className={`text-[8px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${actionInfo.bgColor} ${actionInfo.color}`}>
+                                                    {actionInfo.label}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {hasSnapshot && (
+                                                        <ZoomIn size={10} className="text-slate-700 group-hover:text-blue-400 transition-colors" />
+                                                    )}
+                                                    <span className="text-[9px] text-slate-500 font-mono">{new Date(entry.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-[11px] font-medium text-slate-200 leading-snug">{entry.description}</p>
+
+                                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                                                <span className={`text-[8px] uppercase font-bold tracking-wider ${isLatest ? 'text-[#10B981]' : 'text-slate-600'}`}>
+                                                    {isLatest ? 'Текущая версия' : new Date(entry.createdAt).toLocaleDateString('ru-RU')}
+                                                </span>
+                                                {hasSnapshot && !isLatest && (
+                                                    <span className="text-[8px] text-blue-400/50 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        Нажмите для просмотра
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <Clock size={32} className="text-slate-700 mb-4 opacity-20" />
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">История пуста</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-white/5 bg-black/20">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Просмотр</span>
+            </div>
+        </div>
+    )
+}
+

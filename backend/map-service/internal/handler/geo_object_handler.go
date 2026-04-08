@@ -67,19 +67,11 @@ func (h *GeoObjectHandler) Create(c *gin.Context) {
 // GetByID handles getting a geo object by ID
 func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "validation_error",
-			Message: "Invalid object ID",
-		})
-		return
-	}
 
 	userID, _ := middleware.GetUserID(c)
 	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.GetByID(c.Request.Context(), id, userID, canEdit)
+	resp, err := h.service.GetByID(c.Request.Context(), idStr, userID, canEdit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"
@@ -96,6 +88,34 @@ func (h *GeoObjectHandler) GetByID(c *gin.Context) {
 		c.JSON(status, dto.ErrorResponse{
 			Error:   errorMsg,
 			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetVersions handles getting all versions of a geo object by base_id
+func (h *GeoObjectHandler) GetVersions(c *gin.Context) {
+	baseIDStr := c.Param("base_id")
+	baseID, err := uuid.Parse(baseIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "validation_error",
+			Message: "Invalid base ID",
+		})
+		return
+	}
+
+	userID, _ := middleware.GetUserID(c)
+	canEdit := middleware.CanEdit(c)
+
+	resp, err := h.service.GetAllVersionsByBaseID(c.Request.Context(), baseID, userID, canEdit)
+	if err != nil {
+		log.Printf("[ERROR] GetVersions failed: %v", err)
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to retrieve versions",
 		})
 		return
 	}
@@ -162,14 +182,6 @@ func (h *GeoObjectHandler) GetAll(c *gin.Context) {
 // Update handles updating a geo object
 func (h *GeoObjectHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "validation_error",
-			Message: "Invalid object ID",
-		})
-		return
-	}
 
 	var req dto.UpdateGeoObjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -183,7 +195,7 @@ func (h *GeoObjectHandler) Update(c *gin.Context) {
 	userID, _ := middleware.GetUserID(c)
 	canEdit := middleware.CanEdit(c)
 
-	resp, err := h.service.Update(c.Request.Context(), id, userID, canEdit, &req)
+	resp, err := h.service.Update(c.Request.Context(), idStr, userID, canEdit, &req)
 	if err != nil {
 		status := http.StatusInternalServerError
 		errorMsg := "internal_error"

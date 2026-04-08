@@ -196,6 +196,11 @@ class ApiService {
     return response.data;
   }
 
+  async getGeoObjectVersions(baseId: string): Promise<GeoObjectListResponse> {
+    const response = await this.mapClient.get<GeoObjectListResponse>(`/api/map/objects/${baseId}/versions`);
+    return response.data;
+  }
+
   async rollbackToHistory(historyId: string): Promise<{ success: boolean; message: string }> {
     const response = await this.mapClient.post<{ success: boolean; message: string }>(`/api/map/history/${historyId}/rollback`);
     return response.data;

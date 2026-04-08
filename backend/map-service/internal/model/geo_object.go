@@ -9,7 +9,9 @@ import (
 
 // GeoObject represents a geographic object in the system
 type GeoObject struct {
-	ID          uuid.UUID       `json:"id" db:"id"`
+	ID          string          `json:"id" db:"id"`
+	BaseID      uuid.UUID       `json:"base_id" db:"base_id"`
+	Version     int             `json:"version" db:"version"`
 	OwnerID     *uuid.UUID      `json:"owner_id,omitempty" db:"owner_id"`
 	Scope       string          `json:"scope" db:"scope"`
 	Type        string          `json:"type" db:"type"`
@@ -75,7 +77,9 @@ func IsValidType(objType string) bool {
 
 // GeoObjectWithGeometry represents a geo object with parsed geometry
 type GeoObjectWithGeometry struct {
-	ID          uuid.UUID       `json:"id"`
+	ID          string          `json:"id"`
+	BaseID      uuid.UUID       `json:"base_id"`
+	Version     int             `json:"version"`
 	OwnerID     *uuid.UUID      `json:"owner_id,omitempty"`
 	Scope       string          `json:"scope"`
 	Type        string          `json:"type"`
