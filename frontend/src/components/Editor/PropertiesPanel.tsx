@@ -150,6 +150,10 @@ export default function PropertiesPanel() {
         return { type: g.type, coordCount: count }
     }, [feature])
 
+    const areaLabel = useMemo(() => {
+        return formatAreaKm2(feature?.metadata?.area_km2)
+    }, [feature?.metadata])
+
     const exportGeoJSON = () => {
         if (!feature) return
         const fc = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { class: feature.featureClass, name: feature.name }, geometry: feature.geometry }] }
@@ -372,6 +376,12 @@ export default function PropertiesPanel() {
                             <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Вершины</span>
                             <span className="text-[10px] text-slate-200 font-mono font-bold">{geomInfo.coordCount}</span>
                         </div>
+                        {areaLabel && (
+                            <div className="bg-white/[0.03] rounded-xl p-3 border border-white/5 col-span-2">
+                                <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Площадь</span>
+                                <span className="text-[10px] text-slate-200 font-mono font-bold">{areaLabel}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -573,6 +583,15 @@ function MultiSelectItem({ feature, isExpanded, onToggleExpand }: MultiSelectIte
             )}
         </div>
     )
+}
+
+function formatAreaKm2(value: unknown): string | null {
+    const n = typeof value === 'number' ? value : Number(value)
+    if (!Number.isFinite(n) || n <= 0) return null
+
+    if (n >= 100) return `${n.toFixed(2)} km2`
+    if (n >= 1) return `${n.toFixed(4)} km2`
+    return `${n.toFixed(6)} km2`
 }
 
 function countCoords(coords: any): number {
