@@ -58,6 +58,10 @@ export default function ViewerPropertiesPanel() {
         return { type: g.type, coordCount: count }
     }, [selectedFeature])
 
+    const areaLabel = useMemo(() => {
+        return formatAreaKm2(selectedFeature?.metadata?.area_km2)
+    }, [selectedFeature?.metadata])
+
     if (selectedFeatureIds.length > 1) {
         return (
             <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
@@ -208,6 +212,12 @@ export default function ViewerPropertiesPanel() {
                             <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Вершины</span>
                             <span className="text-[10px] text-slate-200 font-mono font-bold">{geomInfo.coordCount}</span>
                         </div>
+                        {areaLabel && (
+                            <div className="bg-white/[0.03] rounded-xl p-3 border border-white/5 col-span-2">
+                                <span className="text-[8px] font-bold text-slate-600 uppercase block mb-1">Площадь</span>
+                                <span className="text-[10px] text-slate-200 font-mono font-bold">{areaLabel}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -245,6 +255,7 @@ function ViewerMultiSelectItem({
         if ('coordinates' in g) count = countCoords(g.coordinates)
         return { type: g.type, coordCount: count }
     })()
+    const areaLabel = formatAreaKm2(feature?.metadata?.area_km2)
 
     return (
         <div className="bg-white/[0.03] border border-white/5 rounded-xl overflow-hidden">
@@ -308,6 +319,12 @@ function ViewerMultiSelectItem({
                             <span className="text-[7px] text-slate-500 uppercase block mb-1">Вершины</span>
                             <span className="text-[10px] text-slate-200 font-mono font-bold">{geomInfo.coordCount}</span>
                         </div>
+                        {areaLabel && (
+                            <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5 col-span-2">
+                                <span className="text-[7px] text-slate-500 uppercase block mb-1">Площадь</span>
+                                <span className="text-[10px] text-slate-200 font-mono font-bold">{areaLabel}</span>
+                            </div>
+                        )}
                     </div>
 
                     {schema && schema.fields && schema.fields.length > 0 && (
@@ -347,4 +364,13 @@ function ViewerMultiSelectItem({
             )}
         </div>
     )
+}
+
+function formatAreaKm2(value: unknown): string | null {
+    const n = typeof value === 'number' ? value : Number(value)
+    if (!Number.isFinite(n) || n <= 0) return null
+
+    if (n >= 100) return `${n.toFixed(2)} km2`
+    if (n >= 1) return `${n.toFixed(4)} km2`
+    return `${n.toFixed(6)} km2`
 }
