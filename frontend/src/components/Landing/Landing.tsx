@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Pencil, Layers, Globe } from 'lucide-react'
 import { animate } from 'animejs'
@@ -14,7 +14,8 @@ gsap.registerPlugin(ScrollTrigger)
 
 /* ── Component ───────────────────────────────────────────── */
 export default function Landing() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, setAuthData } = useAuth()
+  const navigate = useNavigate()
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'verify' | null>(null)
   const [globeSize, setGlobeSize] = useState(() =>
     Math.max(window.innerWidth, window.innerHeight) * 1.5
@@ -51,10 +52,9 @@ export default function Landing() {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
       if (event.data.type === 'oauth_success') {
-        localStorage.setItem('token', event.data.token)
-        localStorage.setItem('user', JSON.stringify(event.data.user))
-        // Force re-render by updating state
-        window.location.reload()
+        setAuthData(event.data.token, event.data.user)
+        const role = event.data.user?.role
+        navigate(role === 'admin' || role === 'expert' ? '/editor' : '/map')
       }
     }
     window.addEventListener('message', handleMessage)
