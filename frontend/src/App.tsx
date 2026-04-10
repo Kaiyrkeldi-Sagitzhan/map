@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import MapEditor from './components/Editor/MapEditor'
 import Layout from './components/Layout/Layout'
@@ -33,8 +33,10 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const location = useLocation()
+
   return (
-    <Routes>
+    <Routes location={location} key={location.pathname}>
       <Route path="/" element={<Landing />} />
       <Route path="/auth/google/callback" element={<OAuthCallback />} />
 

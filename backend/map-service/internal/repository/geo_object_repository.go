@@ -32,8 +32,30 @@ func NewGeoObjectRepository(db *sqlx.DB) *GeoObjectRepository {
 // Create creates a new geo object in the database
 func (r *GeoObjectRepository) Create(ctx context.Context, obj *model.GeoObject) error {
 	query := `
-		INSERT INTO geo_objects (id, base_id, version, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ST_GeomFromGeoJSON($10), $11, $12)
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($8), 4326) AS g
+		)
+		INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at)
+		SELECT
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			CASE
+				WHEN GeometryType(geom.g) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($7::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(geom.g::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(geom.g::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($7::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geom.g,
+			$9,
+			$10
+		FROM geom
 	`
 
 	// Extract geometry from Feature if needed (Leaflet Draw produces Feature objects)
@@ -61,8 +83,6 @@ func (r *GeoObjectRepository) Create(ctx context.Context, obj *model.GeoObject) 
 
 	_, err = r.db.ExecContext(ctx, query,
 		obj.ID,
-		obj.BaseID,
-		obj.Version,
 		obj.OwnerID,
 		obj.Scope,
 		obj.Type,
@@ -101,9 +121,9 @@ func extractGeometryJSON(geometry []byte) (json.RawMessage, error) {
 }
 
 // GetByID retrieves a geo object by ID
-func (r *GeoObjectRepository) GetByID(ctx context.Context, id string) (*model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.GeoObjectWithGeometry, error) {
 	query := `
-		SELECT id, base_id, version, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
+		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, 
 		       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
 		FROM geo_objects
 		WHERE id = $1
@@ -321,7 +341,29 @@ func (r *GeoObjectRepository) GetByType(ctx context.Context, objType string) ([]
 
 // Update updates a geo object in the database
 func (r *GeoObjectRepository) Update(ctx context.Context, obj *model.GeoObject) error {
-	query := `UPDATE geo_objects SET scope = $2, type = $3, name = $4, description = $5, metadata = $6, geometry = ST_GeomFromGeoJSON($7), updated_at = $8 WHERE id = $1`
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($7), 4326) AS g
+		)
+		UPDATE geo_objects
+		SET
+			scope = $2,
+			type = $3,
+			name = $4,
+			description = $5,
+			metadata = CASE
+				WHEN GeometryType((SELECT g FROM geom)) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($6::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(((SELECT g FROM geom))::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(((SELECT g FROM geom))::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($6::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geometry = (SELECT g FROM geom),
+			updated_at = $8
+		WHERE id = $1
+	`
 	geometryBytes, _ := json.Marshal(obj.Geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	metadata := obj.Metadata
@@ -451,7 +493,29 @@ func (r *GeoObjectRepository) UpdateFromSnapshot(ctx context.Context, id uuid.UU
 	if g, ok := data["geometry"]; ok {
 		geometry = g
 	}
-	query := `UPDATE geo_objects SET scope = $2, type = $3, name = $4, description = $5, metadata = $6, geometry = ST_GeomFromGeoJSON($7), updated_at = NOW() WHERE id = $1`
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($7), 4326) AS g
+		)
+		UPDATE geo_objects
+		SET
+			scope = $2,
+			type = $3,
+			name = $4,
+			description = $5,
+			metadata = CASE
+				WHEN GeometryType((SELECT g FROM geom)) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($6::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(((SELECT g FROM geom))::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(((SELECT g FROM geom))::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($6::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geometry = (SELECT g FROM geom),
+			updated_at = NOW()
+		WHERE id = $1
+	`
 	geometryBytes, _ := json.Marshal(geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	_, err := r.db.ExecContext(ctx, query, id, scope, objType, name, description, metadata, string(geometryJSON))
@@ -482,97 +546,34 @@ func (r *GeoObjectRepository) RestoreFromSnapshot(ctx context.Context, id uuid.U
 			ownerID = &u
 		}
 	}
-	query := `INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, ST_GeomFromGeoJSON($8), NOW(), NOW())`
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($8), 4326) AS g
+		)
+		INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at)
+		SELECT
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			CASE
+				WHEN GeometryType(geom.g) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($7::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(geom.g::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(geom.g::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($7::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geom.g,
+			NOW(),
+			NOW()
+		FROM geom
+	`
 	geometryBytes, _ := json.Marshal(geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	_, err := r.db.ExecContext(ctx, query, id, ownerID, scope, objType, name, description, metadata, string(geometryJSON))
 	return err
-}
-
-// GetMaxVersionForBaseID gets the maximum version for a given base_id
-func (r *GeoObjectRepository) GetMaxVersionForBaseID(ctx context.Context, baseID uuid.UUID) (int, error) {
-	query := `SELECT COALESCE(MAX(version), 0) FROM geo_objects WHERE base_id = $1`
-	var maxVersion int
-	err := r.db.GetContext(ctx, &maxVersion, query, baseID)
-	return maxVersion, err
-}
-
-// GetAllVersionsByBaseID gets all versions of an object by base_id
-func (r *GeoObjectRepository) GetAllVersionsByBaseID(ctx context.Context, baseID uuid.UUID) ([]model.GeoObjectWithGeometry, error) {
-	query := `SELECT id, base_id, version, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE base_id = $1 ORDER BY version ASC`
-	rows, err := r.db.QueryContext(ctx, query, baseID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var objects []model.GeoObjectWithGeometry
-	for rows.Next() {
-		var obj model.GeoObjectWithGeometry
-		var geometryDB []byte
-		err := rows.Scan(
-			&obj.ID,
-			&obj.BaseID,
-			&obj.Version,
-			&obj.OwnerID,
-			&obj.Scope,
-			&obj.Type,
-			&obj.Name,
-			&obj.Description,
-			&obj.Metadata,
-			&geometryDB,
-			&obj.CreatedAt,
-			&obj.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		obj.Geometry = json.RawMessage(geometryDB)
-		objects = append(objects, obj)
-	}
-	return objects, nil
-}
-
-// GetMaxVersionForBaseID gets the maximum version for a given base_id
-func (r *GeoObjectRepository) GetMaxVersionForBaseID(ctx context.Context, baseID uuid.UUID) (int, error) {
-	query := `SELECT COALESCE(MAX(version), 0) FROM geo_objects WHERE base_id = $1`
-	var maxVersion int
-	err := r.db.GetContext(ctx, &maxVersion, query, baseID)
-	return maxVersion, err
-}
-
-// GetAllVersionsByBaseID gets all versions of an object by base_id
-func (r *GeoObjectRepository) GetAllVersionsByBaseID(ctx context.Context, baseID uuid.UUID) ([]model.GeoObjectWithGeometry, error) {
-	query := `SELECT id, base_id, version, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE base_id = $1 ORDER BY version ASC`
-	rows, err := r.db.QueryContext(ctx, query, baseID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var objects []model.GeoObjectWithGeometry
-	for rows.Next() {
-		var obj model.GeoObjectWithGeometry
-		var geometryDB []byte
-		err := rows.Scan(
-			&obj.ID,
-			&obj.BaseID,
-			&obj.Version,
-			&obj.OwnerID,
-			&obj.Scope,
-			&obj.Type,
-			&obj.Name,
-			&obj.Description,
-			&obj.Metadata,
-			&geometryDB,
-			&obj.CreatedAt,
-			&obj.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		obj.Geometry = json.RawMessage(geometryDB)
-		objects = append(objects, obj)
-	}
-	return objects, nil
 }

@@ -58,14 +58,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
       # Google OAuth
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-802334362365-0nuf4kqu0l3lc78kldnalqell9ddop88.apps.googleusercontent.com}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:3000/auth/google/callback}
+      GOOGLE_ALLOWED_REDIRECT_URLS: ${GOOGLE_ALLOWED_REDIRECT_URLS:-}
       # SMTP (for email verification)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-adil.groud@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-wypg eorn rqha fcxi}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: noreply@freshmap.team
     ports:
       - "8081:8081"
@@ -118,10 +119,6 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     container_name: kzmap-frontend
-    environment:
-      VITE_API_URL: http://localhost:8080
-      VITE_AUTH_SERVICE_URL: http://api-gateway
-      VITE_MAP_SERVICE_URL: http://api-gateway
     ports:
       - "3000:3000"
     depends_on:
@@ -168,18 +165,25 @@ services:
       - kzmap-network
     entrypoint: >
       sh -c "
-      echo 'Checking database state...'
-      count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM information_schema.tables WHERE table_name = 'geo_objects';\")
-      if [ $$count -eq 0 ]; then
-        echo 'Database empty. Running migrations and import...'
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql
-        ./load_all_gpkg.sh
+      echo 'Running all migrations (idempotent)...';
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/005_area_metadata.sql;
+      echo 'Migrations done.';
+      echo 'Loading geodata if gpkg exists...';
+      if [ -f gpkg_data/kazakhstan.gpkg ]; then
+        count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM geo_objects;\");
+        if [ $$count -lt 500000 ]; then
+          echo 'Less than 500k objects, running full import...';
+          DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
+        else
+          echo \"Already have $$count objects, skipping import.\";
+        fi;
       else
-        echo 'Database already initialized.'
-      fi
+        echo 'No gpkg file found. Download it first (see README).';
+      fi;
       "
 
 volumes:
