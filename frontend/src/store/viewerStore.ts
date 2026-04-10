@@ -75,7 +75,7 @@ interface ViewerState {
   setFeatureClassFilter: (filter: string) => void
 }
 
-const ALL_LAYERS = new Set(['lake', 'river', 'forest', 'road', 'building', 'city', 'mountain', 'boundary', 'other'])
+const ALL_LAYERS = new Set(['lake', 'river', 'forest', 'road', 'mountain', 'boundary', 'other'])
 
 export const useViewerStore = create<ViewerState>((set) => ({
   selectedFeature: null,
