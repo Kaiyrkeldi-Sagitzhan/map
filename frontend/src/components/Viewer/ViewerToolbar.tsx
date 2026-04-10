@@ -20,8 +20,6 @@ const VIEWER_TYPES = [
     { value: 'river', label: 'Реки' },
     { value: 'forest', label: 'Леса' },
     { value: 'road', label: 'Дороги' },
-    { value: 'building', label: 'Здания' },
-    { value: 'city', label: 'Нас. пункты' },
     { value: 'other', label: 'Другое' },
 ]
 

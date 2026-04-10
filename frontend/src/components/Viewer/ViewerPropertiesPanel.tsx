@@ -3,9 +3,9 @@
  * Same floating glassmorphic style as editor's PropertiesPanel.
  * Displays feature properties read-only (no inputs, no save/delete).
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useViewerStore } from '../../store/viewerStore'
-import { X, Box, Type, Layers, Settings2, Activity, ChevronRight } from 'lucide-react'
+import { X, Box, Type, Layers, Settings2, Activity, ChevronRight, Clock, History, ZoomIn, MousePointer2 } from 'lucide-react'
 import { FEATURE_SCHEMAS } from '../../types/schema'
 
 const CLASS_LABELS: Record<string, string> = {
@@ -35,7 +35,13 @@ export default function ViewerPropertiesPanel() {
     const selectedFeatureIds = useViewerStore((s) => s.selectedFeatureIds)
     const setPrimarySelectedFeature = useViewerStore((s) => s.setPrimarySelectedFeature)
     const clearSelection = useViewerStore((s) => s.clearSelection)
+    const serverHistory = useViewerStore((s) => s.serverHistory)
+    const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
+    const setHighlight = useViewerStore((s) => s.setHighlight)
+    const clearHighlight = useViewerStore((s) => s.clearHighlight)
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+    const [activeTab, setActiveTab] = useState<'info' | 'history'>('info')
+    const [isCollapsed, setIsCollapsed] = useState(false)
 
     const toggleExpanded = (id: string) => {
         setExpandedIds((prev) => {
@@ -61,6 +67,54 @@ export default function ViewerPropertiesPanel() {
     const areaLabel = useMemo(() => {
         return formatAreaKm2(selectedFeature?.metadata?.area_km2)
     }, [selectedFeature?.metadata])
+
+    useEffect(() => {
+        if (activeTab === 'history' && selectedFeature) {
+            fetchFeatureHistory(selectedFeature.backendId || selectedFeature.id)
+        }
+    }, [activeTab, selectedFeature?.id, selectedFeature?.backendId, fetchFeatureHistory])
+
+    const handleHistoryHover = (entry: any) => {
+        const snapshot = entry.afterSnapshot || entry.beforeSnapshot
+        if (snapshot?.geometry) {
+            setHighlight(snapshot.geometry, { color: '#3b82f6', fillColor: '#3b82f6', weight: 4, fillOpacity: 0.25, dashArray: '8,4' })
+        }
+    }
+
+    const handleHistoryLeave = () => {
+        if (selectedFeature?.geometry) {
+            setHighlight(selectedFeature.geometry, {
+                color: '#ff4500',
+                fillColor: '#ff4500',
+                weight: 4,
+                fillOpacity: 0.25,
+            })
+        } else {
+            clearHighlight()
+        }
+    }
+
+    const handleHistoryClick = (entry: any) => {
+        const snapshot = entry.afterSnapshot || entry.beforeSnapshot
+        if (snapshot?.geometry) {
+            setHighlight(snapshot.geometry, { color: '#f59e0b', fillColor: '#f59e0b', weight: 4, fillOpacity: 0.3, dashArray: '6,6' })
+            const map = (window as any).leafletMap
+            if (map) {
+                try {
+                    const L = (window as any).L
+                    if (L) {
+                        const layer = L.geoJSON({ type: 'Feature', properties: {}, geometry: snapshot.geometry })
+                        const bounds = layer.getBounds()
+                        if (bounds.isValid()) {
+                            map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
+                        }
+                    }
+                } catch {
+                    // ignore map-fit errors
+                }
+            }
+        }
+    }
 
     if (selectedFeatureIds.length > 1) {
         return (
@@ -109,16 +163,40 @@ export default function ViewerPropertiesPanel() {
     const style = selectedFeature.style
 
     return (
-        <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px] transition-all duration-300 ${isCollapsed ? 'h-14 w-14' : 'bottom-28 w-[320px]'}`}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
-                    <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>
+                    {!isCollapsed && <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>}
                 </div>
-                <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
+                <div className="flex items-center gap-1">
+                    <button onClick={() => setIsCollapsed((v) => !v)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} className={`transition-transform ${isCollapsed ? 'rotate-180' : ''}`} /></button>
+                    {!isCollapsed && <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>}
+                </div>
+            </div>
+
+            {!isCollapsed && (
+            <>
+            <div className="px-4 pt-3">
+                <div className="flex bg-black/40 rounded-xl p-1">
+                    <button
+                        onClick={() => setActiveTab('info')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${activeTab === 'info' ? 'bg-[#10B981] text-[#020C1B] shadow-lg shadow-[#10B981]/20' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        <Box size={14} /> Инфо
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${activeTab === 'history' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        <Clock size={14} /> История
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-6">
+                {activeTab === 'info' ? (
+                <>
                 {/* Name & Type */}
                 <div className="space-y-4">
                     <div>
@@ -220,7 +298,65 @@ export default function ViewerPropertiesPanel() {
                         )}
                     </div>
                 </div>
+                </>
+                ) : (
+                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                    {!selectedFeatureIds.length ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-5 border border-white/5">
+                                <MousePointer2 size={24} className="text-slate-700 opacity-50" />
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Объект не выбран</p>
+                        </div>
+                    ) : serverHistory.length > 0 ? (
+                        <div className="relative pl-4 mt-2">
+                            <div className="absolute left-1 top-2 bottom-2 w-px bg-gradient-to-b from-[#10B981] via-white/10 to-transparent" />
+                            <div className="space-y-4">
+                                {[...serverHistory]
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map((entry, idx) => {
+                                        const isLatest = idx === 0
+                                        const hasSnapshot = !!(entry.afterSnapshot?.geometry || entry.beforeSnapshot?.geometry)
+                                        return (
+                                            <div
+                                                key={entry.id}
+                                                className="relative group"
+                                                onMouseEnter={() => hasSnapshot && handleHistoryHover(entry)}
+                                                onMouseLeave={handleHistoryLeave}
+                                            >
+                                                <div className={`absolute -left-[15px] top-2.5 w-2 h-2 rounded-full border z-10 transition-all duration-300 ${isLatest ? 'bg-[#10B981] border-white scale-125 shadow-[0_0_10px_#10B981]' : 'bg-slate-900 border-slate-700 group-hover:bg-blue-500 group-hover:border-blue-400 group-hover:shadow-[0_0_8px_#3b82f6]'}`} />
+
+                                                <div
+                                                    className={`p-3 rounded-xl border transition-all duration-200 cursor-pointer ${isLatest ? 'bg-white/10 border-[#10B981]/30 shadow-lg' : 'bg-white/[0.03] border-transparent hover:bg-white/[0.08] hover:border-blue-500/30'}`}
+                                                    onClick={() => hasSnapshot && handleHistoryClick(entry)}
+                                                >
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className="text-[8px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-blue-500/10 text-blue-300">
+                                                            {entry.action}
+                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            {hasSnapshot && <ZoomIn size={10} className="text-slate-700 group-hover:text-blue-400 transition-colors" />}
+                                                            <span className="text-[9px] text-slate-500 font-mono">{new Date(entry.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[11px] font-medium text-slate-200 leading-snug">{entry.description}</p>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-16 text-center">
+                            <History size={32} className="text-slate-700 mb-4 opacity-20" />
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">История пуста</p>
+                        </div>
+                    )}
+                </div>
+                )}
             </div>
+            </>
+            )}
         </div>
     )
 }

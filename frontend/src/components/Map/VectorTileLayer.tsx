@@ -7,10 +7,12 @@ import { getAdvancedStyle } from '../../types/editor'
 import { useEditorStore } from '../../store/editorStore'
 import { useViewerStore } from '../../store/viewerStore'
 
+const DISABLED_TYPES = new Set(['building', 'city'])
+
 export default function VectorTileLayer() {
     const map = useMap()
     const layerRef = useRef<any>(null)
-    const visibleLayersRef = useRef<Set<string>>(new Set(['lake', 'river', 'forest', 'road', 'building', 'city', 'mountain', 'boundary', 'other']))
+    const visibleLayersRef = useRef<Set<string>>(new Set(['lake', 'river', 'forest', 'road', 'mountain', 'boundary', 'other']))
     const featureClassFilterRef = useRef<string>('')
     const isViewer = window.location.pathname.startsWith('/map')
 
@@ -41,6 +43,9 @@ export default function VectorTileLayer() {
             rendererFactory: (L.canvas as any).tile,
             vectorTileLayerStyles: {
                 objects: (properties: any) => {
+                    if (DISABLED_TYPES.has(properties.type)) {
+                        return { fill: false, stroke: false, weight: 0, opacity: 0, fillOpacity: 0 }
+                    }
                     // Hide layers that are toggled off in viewer
                     if (isViewer && !visibleLayersRef.current.has(properties.type)) {
                         return { fill: false, stroke: false, weight: 0, opacity: 0, fillOpacity: 0 }
@@ -104,6 +109,9 @@ export default function VectorTileLayer() {
             if (isViewerPage && tool !== 'searchArea') {
                 const filter = useViewerStore.getState().featureClassFilter
                 const featureType = props?.type
+                if (DISABLED_TYPES.has(featureType)) {
+                    return
+                }
                 if (filter && featureType && featureType !== filter) {
                     console.log('[VTL] blocked — type mismatch', { filter, featureType })
                     return // Ignore click on dimmed (non-matching) object

@@ -21,11 +21,20 @@ import {
     Settings2, 
     Activity,
     CheckCircle2,
-    ChevronRight
+    ChevronRight,
+    Clock,
+    History,
+    RotateCcw
 } from 'lucide-react'
 import { FEATURE_SCHEMAS } from '../../types/schema'
 
-const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
+const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'other', 'custom']
+
+const ACTION_LABELS: Record<string, { label: string; color: string; bgColor: string }> = {
+    create: { label: 'Создание', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
+    update: { label: 'Изменение', color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
+    delete: { label: 'Удаление', color: 'text-red-400', bgColor: 'bg-red-500/10' },
+}
 
 export default function PropertiesPanel() {
     const selectedFeatureId = useEditorStore((s) => s.selectedFeatureId)
@@ -40,9 +49,16 @@ export default function PropertiesPanel() {
     const isGeometryDirty = useEditorStore((s) => s.isGeometryDirty)
     const setGeometryDirty = useEditorStore((s) => s.setGeometryDirty)
     const fetchFeatureHistory = useEditorStore((s) => s.fetchFeatureHistory)
+    const serverHistory = useEditorStore((s) => s.serverHistory)
+    const rollbackToHistory = useEditorStore((s) => s.rollbackToHistory)
+    const silentUpdateFeature = useEditorStore((s) => s.silentUpdateFeature)
 
     // Track which features are expanded in multi-select view
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+    const [activeTab, setActiveTab] = useState<'info' | 'history'>('info')
+    const [isCollapsed, setIsCollapsed] = useState(false)
+    const [rollbackPopup, setRollbackPopup] = useState<any | null>(null)
+    const previewRestore = useRef<any>(null)
 
     const toggleExpanded = (id: string) => {
         setExpandedIds(prev => {
@@ -92,6 +108,60 @@ export default function PropertiesPanel() {
     }, [feature])
 
     const markDirty = () => setIsDirty(true)
+
+    useEffect(() => {
+        if (activeTab === 'history' && feature) {
+            fetchFeatureHistory(feature.backendId || feature.id)
+        }
+    }, [activeTab, feature?.id, feature?.backendId, fetchFeatureHistory])
+
+    const handleEntryHover = (entry: any) => {
+        if (!feature) return
+        const snap = entry.afterSnapshot
+        if (!snap) return
+
+        previewRestore.current = { ...feature }
+        silentUpdateFeature(feature.id, {
+            visible: true,
+            name: snap.name || feature.name,
+            geometry: snap.geometry || feature.geometry,
+            featureClass: snap.type || feature.featureClass,
+        })
+    }
+
+    const handleEntryLeave = () => {
+        if (!previewRestore.current || !feature) return
+        const f = previewRestore.current
+        silentUpdateFeature(feature.id, {
+            name: f.name,
+            featureClass: f.featureClass,
+            geometry: f.geometry,
+            visible: f.visible,
+        })
+        previewRestore.current = null
+    }
+
+    const confirmRollback = async () => {
+        if (!rollbackPopup || !feature) return
+        try {
+            await rollbackToHistory(rollbackPopup.id)
+            const restoredObj = await apiService.getGeoObjectById(feature.backendId || feature.id)
+            if (restoredObj) {
+                updateFeature(feature.id, {
+                    geometry: restoredObj.geometry as any,
+                    metadata: restoredObj.metadata as any,
+                    name: restoredObj.name,
+                    description: restoredObj.description || '',
+                })
+            }
+            await fetchFeatureHistory(feature.backendId || feature.id)
+            window.dispatchEvent(new Event('refresh-map'))
+            setRollbackPopup(null)
+        } catch (err) {
+            console.error('[Rollback] Error:', err)
+            alert('Ошибка при откате изменений')
+        }
+    }
 
     const handleSave = async () => {
         if (!feature) return
@@ -205,16 +275,41 @@ export default function PropertiesPanel() {
     )
 
     return (
-        <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+        <>
+        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px] transition-all duration-300 ${isCollapsed ? 'h-14 w-14' : 'bottom-28 w-[320px]'}`}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
-                    <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>
+                    {!isCollapsed && <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>}
                 </div>
-                <button onClick={handleClose} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
+                <div className="flex items-center gap-1">
+                    <button onClick={() => setIsCollapsed((v) => !v)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} className={`transition-transform ${isCollapsed ? 'rotate-180' : ''}`} /></button>
+                    {!isCollapsed && <button onClick={handleClose} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>}
+                </div>
+            </div>
+
+            {!isCollapsed && (
+            <>
+            <div className="px-4 pt-3">
+                <div className="flex bg-black/40 rounded-xl p-1">
+                    <button
+                        onClick={() => setActiveTab('info')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${activeTab === 'info' ? 'bg-[#10B981] text-[#020C1B] shadow-lg shadow-[#10B981]/20' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        <Box size={14} /> Инфо
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 ${activeTab === 'history' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        <Clock size={14} /> История
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-6">
+                {activeTab === 'info' ? (
+                <>
                 {/* Basic Section */}
                 <div className="space-y-4">
                     <div className="group">
@@ -384,9 +479,61 @@ export default function PropertiesPanel() {
                         )}
                     </div>
                 </div>
+                </>
+                ) : (
+                <div className="pt-2">
+                    {serverHistory.length > 0 ? (
+                        <div className="relative pl-4 mt-2">
+                            <div className="absolute left-1 top-2 bottom-2 w-px bg-gradient-to-b from-[#10B981] via-white/10 to-transparent" />
+                            <div className="space-y-6">
+                                {[...serverHistory]
+                                    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map((entry: any, idx: number) => {
+                                        const actionInfo = ACTION_LABELS[entry.action] || { label: entry.action, color: 'text-slate-400', bgColor: 'bg-slate-500/10' }
+                                        const isLatest = idx === 0
+                                        return (
+                                            <div
+                                                key={entry.id}
+                                                className="relative group cursor-pointer"
+                                                onMouseEnter={() => handleEntryHover(entry)}
+                                                onMouseLeave={handleEntryLeave}
+                                                onClick={() => setRollbackPopup(entry)}
+                                            >
+                                                <div className={`absolute -left-[15px] top-2.5 w-2 h-2 rounded-full border z-10 transition-all duration-300 ${isLatest ? 'bg-[#10B981] border-white scale-125 shadow-[0_0_10px_#10B981]' : 'bg-slate-900 border-slate-700'}`} />
+
+                                                <div className={`p-3 rounded-xl border transition-all duration-300 ${isLatest ? 'bg-white/10 border-[#10B981]/30 shadow-lg' : 'bg-white/5 border-transparent hover:border-white/10 hover:bg-white/10'}`}>
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${actionInfo.bgColor} ${actionInfo.color}`}>
+                                                            {actionInfo.label}
+                                                        </span>
+                                                        <span className="text-[9px] text-slate-500 font-mono">{new Date(entry.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                    <p className="text-[11px] font-medium text-slate-200 leading-snug">{entry.description}</p>
+
+                                                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                                                        <span className={`text-[8px] uppercase font-bold tracking-wider ${isLatest ? 'text-[#10B981]' : 'text-slate-600'}`}>{isLatest ? 'Текущая версия' : 'Версия из истории'}</span>
+                                                        {!isLatest && (
+                                                            <RotateCcw size={12} className="text-[#10B981] opacity-0 group-hover:opacity-100 transition-all transform group-hover:-rotate-45" />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <History size={32} className="text-slate-700 mb-4 opacity-20" />
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">История пуста</p>
+                        </div>
+                    )}
+                </div>
+                )}
             </div>
 
             {/* Actions Footer */}
+            {activeTab === 'info' && (
             <div className="p-4 border-t border-white/10 bg-black/20 space-y-3">
                 <button 
                     onClick={handleSave} 
@@ -410,7 +557,46 @@ export default function PropertiesPanel() {
                     <Download size={14} /> Экспорт GeoJSON
                 </button>
             </div>
+            )}
+            </>
+            )}
         </div>
+
+        {rollbackPopup && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-[#0A192F] rounded-[24px] shadow-2xl p-6 max-w-sm w-full border border-white/10 animate-in zoom-in duration-200">
+                    <div className="flex items-center gap-4 mb-5">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                            <RotateCcw size={22} className="text-amber-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-white">Откатить изменения?</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Версия от {new Date(rollbackPopup.createdAt).toLocaleString('ru-RU')}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5 mb-6">
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            Объект <span className="text-white font-bold">"{rollbackPopup.featureName || 'Без названия'}"</span> будет возвращён к этому состоянию. Все текущие изменения будут сохранены в истории.
+                        </p>
+                    </div>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setRollbackPopup(null)}
+                            className="flex-1 px-4 py-3 text-[10px] font-bold uppercase tracking-wider bg-white/5 hover:bg-white/10 text-slate-400 rounded-xl transition-all border border-white/5"
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            onClick={confirmRollback}
+                            className="flex-1 px-4 py-3 text-[10px] font-bold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-[#020C1B] rounded-xl transition-all shadow-lg shadow-amber-500/20"
+                        >
+                            Откатить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     )
 }
 
