@@ -18,7 +18,7 @@ type GeoObject struct {
 	Name        string          `json:"name" db:"name"`
 	Description string          `json:"description,omitempty" db:"description"`
 	Metadata    json.RawMessage `json:"metadata,omitempty" db:"metadata"`
-	Geometry    interface{}     `json:"geometry" db:"geometry"`
+	Geometry    json.RawMessage `json:"geometry" db:"geometry"`
 	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
 }
@@ -31,18 +31,18 @@ const (
 
 // ObjectType constants
 const (
-	TypeRiver      = "river"
-	TypeLake       = "lake"
-	TypeMountain   = "mountain"
-	TypeRegion     = "region"
-	TypeCity       = "city"
-	TypeRoad       = "road"
-	TypeBoundary   = "boundary"
-	TypeForest     = "forest"
-	TypeRelief     = "relief"
-	TypeBuilding   = "building"
-	TypeCustom     = "custom"
-	TypeOther      = "other"
+	TypeRiver    = "river"
+	TypeLake     = "lake"
+	TypeMountain = "mountain"
+	TypeRegion   = "region"
+	TypeCity     = "city"
+	TypeRoad     = "road"
+	TypeBoundary = "boundary"
+	TypeForest   = "forest"
+	TypeRelief   = "relief"
+	TypeBuilding = "building"
+	TypeCustom   = "custom"
+	TypeOther    = "other"
 )
 
 // ValidScopes returns all valid scope values

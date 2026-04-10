@@ -266,6 +266,57 @@ func (h *GeoObjectHandler) Delete(c *gin.Context) {
 	})
 }
 
+// RollbackToVersion handles rolling back a geo object to a specific version
+func (h *GeoObjectHandler) RollbackToVersion(c *gin.Context) {
+	baseIDStr := c.Param("id")
+	baseID, err := uuid.Parse(baseIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "validation_error",
+			Message: "Invalid base ID",
+		})
+		return
+	}
+
+	var req dto.RollbackToVersionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   "validation_error",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	userID, _ := middleware.GetUserID(c)
+	canEdit := middleware.CanEdit(c)
+
+	resp, err := h.service.RollbackToVersion(c.Request.Context(), baseID, req.Version, userID, canEdit)
+	if err != nil {
+		status := http.StatusInternalServerError
+		errorMsg := "internal_error"
+
+		switch err.Error() {
+		case "object not found":
+			status = http.StatusNotFound
+			errorMsg = "not_found"
+		case "access denied":
+			status = http.StatusForbidden
+			errorMsg = "forbidden"
+		case "version not found":
+			status = http.StatusBadRequest
+			errorMsg = "validation_error"
+		}
+
+		c.JSON(status, dto.ErrorResponse{
+			Error:   errorMsg,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
 // HealthCheck returns the health status of the service
 func (h *GeoObjectHandler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{

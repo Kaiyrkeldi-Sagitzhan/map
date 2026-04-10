@@ -135,6 +135,19 @@ export interface GeoObjectHistory {
   createdAt: string;
 }
 
+// Version types
+export interface GeoObjectVersion {
+  id: string;
+  geoObjectId: string;
+  version: number;
+  name: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  geometry: GeoJSON.GeoJSON;
+  createdAt: string;
+  createdBy?: string;
+}
+
 // Complaint types
 export interface Complaint {
   id: string;

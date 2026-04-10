@@ -163,16 +163,13 @@ services:
       - kzmap-network
     entrypoint: >
       sh -c "
-      echo 'Checking database state...'
-      count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM information_schema.tables WHERE table_name = 'geo_objects';\")
-      if [ $$count -eq 0 ]; then
-        echo 'Database empty. Running migrations and import...'
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
-        ./load_all_gpkg.sh
-      else
-        echo 'Database already initialized.'
-      fi
+      echo 'Running all migrations...'
+      for file in database/migrations/*.sql; do
+        echo \"Running migration: $$file\"
+        psql -h postgres -U kzmap_user -d kzmap -f \"$$file\" || echo \"Migration $$file failed\"
+      done
+      echo 'Loading GPKG data...'
+      ./load_all_gpkg.sh || echo 'GPKG loading failed'
       "
 
 volumes:

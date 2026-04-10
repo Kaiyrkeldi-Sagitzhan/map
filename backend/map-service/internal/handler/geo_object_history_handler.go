@@ -30,6 +30,14 @@ func (h *GeoObjectHistoryHandler) GetByObjectID(c *gin.Context) {
 		return
 	}
 
+	// Get the object to find its base_id for history retrieval
+	obj, err := h.service.GetObjectByID(c.Request.Context(), id.String())
+	if err != nil {
+		log.Printf("[ERROR] Failed to get object %s: %v", id, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve object"})
+		return
+	}
+
 	limit := 50
 	if lStr := c.Query("limit"); lStr != "" {
 		if l, err := strconv.Atoi(lStr); err == nil {
@@ -37,7 +45,7 @@ func (h *GeoObjectHistoryHandler) GetByObjectID(c *gin.Context) {
 		}
 	}
 
-	history, err := h.service.GetByObjectID(c.Request.Context(), id, limit)
+	history, err := h.service.GetByObjectID(c.Request.Context(), obj.BaseID, limit)
 	if err != nil {
 		log.Printf("[ERROR] Failed to get history for object %s: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve history"})

@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
-	"strings"
 	"time"
 
 	"map-service/internal/dto"
@@ -27,14 +25,15 @@ var (
 
 // GeoObjectService handles geo object business logic
 type GeoObjectService struct {
-	repo        *repository.GeoObjectRepository
-	historyRepo *repository.GeoObjectHistoryRepository
-	cache       *repository.RedisCache
+	repo           *repository.GeoObjectRepository
+	historyRepo    *repository.GeoObjectHistoryRepository
+	versionService *GeoObjectVersionService
+	cache          *repository.RedisCache
 }
 
 // NewGeoObjectService creates a new GeoObjectService instance
-func NewGeoObjectService(repo *repository.GeoObjectRepository, historyRepo *repository.GeoObjectHistoryRepository, cache *repository.RedisCache) *GeoObjectService {
-	return &GeoObjectService{repo: repo, historyRepo: historyRepo, cache: cache}
+func NewGeoObjectService(repo *repository.GeoObjectRepository, historyRepo *repository.GeoObjectHistoryRepository, versionService *GeoObjectVersionService, cache *repository.RedisCache) *GeoObjectService {
+	return &GeoObjectService{repo: repo, historyRepo: historyRepo, versionService: versionService, cache: cache}
 }
 
 // Create creates a new geo object
@@ -102,7 +101,7 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 			afterSnap := buildSnapshot(created)
 			historyEntry := &model.GeoObjectHistory{
 				ID:            uuid.New(),
-				ObjectID:      obj.ID,
+				ObjectID:      objID,
 				UserID:        userID,
 				Action:        "create",
 				Description:   fmt.Sprintf("Создан объект \"%s\"", obj.Name),
@@ -132,7 +131,7 @@ func (s *GeoObjectService) Create(ctx context.Context, userID uuid.UUID, req *dt
 		Name:        obj.Name,
 		Description: obj.Description,
 		Metadata:    obj.Metadata,
-		Geometry:    obj.Geometry.(json.RawMessage),
+		Geometry:    obj.Geometry,
 		CreatedAt:   obj.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   obj.UpdatedAt.Format(time.RFC3339),
 	}, nil
@@ -159,22 +158,41 @@ func (s *GeoObjectService) GetByID(ctx context.Context, id string, userID uuid.U
 
 // GetAllVersionsByBaseID retrieves all versions of an object by base_id
 func (s *GeoObjectService) GetAllVersionsByBaseID(ctx context.Context, baseID uuid.UUID, userID uuid.UUID, isAdmin bool) (*dto.GeoObjectListResponse, error) {
-	objects, err := s.repo.GetAllVersionsByBaseID(ctx, baseID)
+	// Check if the base object exists and user can access it
+	obj, err := s.repo.GetByID(ctx, baseID.String())
+	if err != nil {
+		return nil, err
+	}
+	if !s.canAccess(obj, userID, isAdmin) {
+		return nil, ErrAccessDenied
+	}
+
+	// Get versions
+	versions, err := s.versionService.GetByGeoObjectID(ctx, baseID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Filter by access
-	var accessible []model.GeoObjectWithGeometry
-	for _, obj := range objects {
-		if s.canAccess(&obj, userID, isAdmin) {
-			accessible = append(accessible, obj)
-		}
-	}
+	// Convert versions to GeoObjectResponse format for compatibility
+	responses := make([]dto.GeoObjectResponse, len(versions))
+	for i, v := range versions {
+		// Geometry in version is stored as GeoJSON string, convert to RawMessage
+		geom := json.RawMessage([]byte(v.Geometry.(string)))
 
-	responses := make([]dto.GeoObjectResponse, len(accessible))
-	for i, obj := range accessible {
-		responses[i] = toResponse(&obj)
+		responses[i] = dto.GeoObjectResponse{
+			ID:          baseID.String(), // Use base object ID
+			BaseID:      baseID,
+			Version:     v.Version,
+			OwnerID:     obj.OwnerID,
+			Scope:       obj.Scope,
+			Type:        obj.Type, // Use base object type
+			Name:        v.Name,
+			Description: v.Description,
+			Metadata:    v.Metadata,
+			Geometry:    geom,
+			CreatedAt:   v.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   v.CreatedAt.Format(time.RFC3339), // Versions don't have updated_at
+		}
 	}
 
 	return &dto.GeoObjectListResponse{
@@ -312,14 +330,16 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 		if scope == "" {
 			scope = model.ScopeGlobal
 		}
-		
+
+		baseID := uuid.New()
+
 		if scope == model.ScopePrivate {
 			ownerID = &userID
 		}
 
 		obj = &model.GeoObject{
-			ID:          id.String(),
-			BaseID:      id,
+			ID:          baseID.String(),
+			BaseID:      baseID,
 			Version:     0,
 			OwnerID:     ownerID,
 			Scope:       scope,
@@ -331,31 +351,22 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
-		
+
 		// Ensure basic fields aren't empty for new object
-		if obj.Type == "" { obj.Type = "custom" }
-		if obj.Name == "" { obj.Name = "Imported Object" }
-		
+		if obj.Type == "" {
+			obj.Type = "custom"
+		}
+		if obj.Name == "" {
+			obj.Name = "Imported Object"
+		}
+
 		err = s.repo.Create(ctx, obj)
 	} else {
-		// Create new version instead of updating
-		baseID := existing.BaseID
-
-		// Get next version number
-		maxVersion, err := s.repo.GetMaxVersionForBaseID(ctx, baseID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get max version: %w", err)
-		}
-		nextVersion := maxVersion + 1
-
-		// Create new ID
-		newID := fmt.Sprintf("%s-%06d", baseID.String(), nextVersion)
-
-		// Start with existing object's data
+		// Update existing object in place
 		obj = &model.GeoObject{
-			ID:          newID,
-			BaseID:      baseID,
-			Version:     nextVersion,
+			ID:          existing.ID,
+			BaseID:      existing.BaseID,
+			Version:     existing.Version,
 			OwnerID:     existing.OwnerID,
 			Scope:       existing.Scope,
 			Type:        existing.Type,
@@ -363,7 +374,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 			Description: existing.Description,
 			Metadata:    existing.Metadata,
 			Geometry:    existing.Geometry,
-			CreatedAt:   now,
+			CreatedAt:   existing.CreatedAt,
 			UpdatedAt:   now,
 		}
 
@@ -396,7 +407,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 			}
 		}
 
-		err = s.repo.Create(ctx, obj)
+		err = s.repo.Update(ctx, obj)
 	}
 
 	if err != nil {
@@ -415,7 +426,7 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 		afterSnap := buildSnapshot(updated)
 		historyEntry := &model.GeoObjectHistory{
 			ID:             uuid.New(),
-			ObjectID:       id,
+			ObjectID:       existing.BaseID,
 			UserID:         userID,
 			Action:         "update",
 			Description:    fmt.Sprintf("Изменён объект \"%s\"", updated.Name),
@@ -442,7 +453,13 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 // Delete deletes a geo object
 func (s *GeoObjectService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool) error {
 	// Get existing object
-	existing, err := s.repo.GetByID(ctx, id)
+	existing, err := s.repo.GetByID(ctx, id.String())
+	if err != nil {
+		if errors.Is(err, repository.ErrObjectNotFound) {
+			return ErrObjectNotFound
+		}
+		return err
+	}
 	if err != nil {
 		if errors.Is(err, repository.ErrObjectNotFound) {
 			return ErrObjectNotFound
@@ -462,6 +479,82 @@ func (s *GeoObjectService) Delete(ctx context.Context, id uuid.UUID, userID uuid
 		_ = s.cache.InvalidateStats(ctx)
 	}
 	return err
+}
+
+// RollbackToVersion rolls back a geo object to a specific version
+func (s *GeoObjectService) RollbackToVersion(ctx context.Context, baseID uuid.UUID, version int, userID uuid.UUID, isAdmin bool) (*dto.GeoObjectResponse, error) {
+	// Get the current object
+	current, err := s.repo.GetByID(ctx, baseID.String())
+	if err != nil {
+		if errors.Is(err, repository.ErrObjectNotFound) {
+			return nil, ErrObjectNotFound
+		}
+		return nil, err
+	}
+
+	// Check access
+	if !s.canModify(current, userID, isAdmin) {
+		return nil, ErrAccessDenied
+	}
+
+	// Get the target version
+	targetVersion, err := s.versionService.GetByGeoObjectIDAndVersion(ctx, baseID, version)
+	if err != nil {
+		return nil, fmt.Errorf("version not found: %w", err)
+	}
+
+	now := time.Now()
+
+	// Create a new object with the target version's data
+	rolledBack := &model.GeoObject{
+		ID:          current.ID,
+		BaseID:      current.BaseID,
+		Version:     version, // Set to the target version
+		OwnerID:     current.OwnerID,
+		Scope:       current.Scope,
+		Type:        current.Type,
+		Name:        targetVersion.Name,
+		Description: targetVersion.Description,
+		Metadata:    targetVersion.Metadata,
+		Geometry:    json.RawMessage([]byte(targetVersion.Geometry.(string))),
+		CreatedAt:   current.CreatedAt,
+		UpdatedAt:   now,
+	}
+
+	// Update the object in database
+	err = s.repo.Update(ctx, rolledBack)
+	if err != nil {
+		return nil, err
+	}
+
+	// Record history
+	if s.historyRepo != nil {
+		beforeSnap := buildSnapshot(current)
+		afterSnap := buildSnapshot(rolledBack)
+		historyEntry := &model.GeoObjectHistory{
+			ID:             uuid.New(),
+			ObjectID:       baseID,
+			UserID:         userID,
+			Action:         "rollback",
+			Description:    fmt.Sprintf("Откат к версии %d", version),
+			BeforeSnapshot: &beforeSnap,
+			AfterSnapshot:  &afterSnap,
+			CreatedAt:      now,
+		}
+		if err := s.historyRepo.Create(ctx, historyEntry); err != nil {
+			log.Printf("[WARN] Failed to record rollback history for object %s: %v", baseID, err)
+		}
+	}
+
+	// Invalidate cache
+	if s.cache != nil {
+		_ = s.cache.InvalidateLists(ctx)
+		_ = s.cache.InvalidateTiles(ctx)
+		_ = s.cache.InvalidateStats(ctx)
+	}
+
+	resp := toResponse(rolledBack)
+	return &resp, nil
 }
 
 // canAccess checks if user can access the object

@@ -197,7 +197,22 @@ class ApiService {
   }
 
   async getGeoObjectVersions(baseId: string): Promise<GeoObjectListResponse> {
-    const response = await this.mapClient.get<GeoObjectListResponse>(`/api/map/objects/${baseId}/versions`);
+    const response = await this.mapClient.get<GeoObjectListResponse>(`/api/map/versions/${baseId}`);
+    return response.data;
+  }
+
+  async getGeoObjectVersionSnapshots(id: string): Promise<any[]> {
+    const response = await this.mapClient.get<any[]>(`/api/map/object-versions/${id}`);
+    return response.data;
+  }
+
+  async createGeoObjectVersion(id: string, data: { name: string; description?: string; metadata?: any; geometry: any }): Promise<any> {
+    const response = await this.mapClient.post(`/api/map/object-versions/${id}`, data);
+    return response.data;
+  }
+
+  async createGeoObjectVersionFromCurrent(id: string, data: { name: string; description?: string }): Promise<any> {
+    const response = await this.mapClient.post(`/api/map/object-versions/${id}/current`, data);
     return response.data;
   }
 

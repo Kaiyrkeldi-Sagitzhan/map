@@ -36,6 +36,7 @@ interface ViewerState {
   selectedFeatureIds: string[]
   serverHistory: ServerHistoryEntry[]
   objectVersions: ViewerFeature[]
+  objectSnapshots: any[]
   // Highlight overlay (GeoJSON to show on map)
   highlightGeometry: any | null
   highlightStyle: any | null
@@ -68,6 +69,7 @@ interface ViewerState {
   setIsSearching: (v: boolean) => void
   fetchFeatureHistory: (objectId: string) => Promise<void>
   fetchFeatureVersions: (baseId: string) => Promise<void>
+  fetchFeatureSnapshots: (objectId: string) => Promise<void>
   setShowMap: (v: boolean) => void
   setMapOpacity: (v: number) => void
   setActiveTool: (tool: 'select' | 'searchArea' | 'history' | 'complaint') => void
@@ -86,6 +88,7 @@ export const useViewerStore = create<ViewerState>((set) => ({
   selectedFeatureIds: [],
   serverHistory: [],
   objectVersions: [],
+  objectSnapshots: [],
   highlightGeometry: null,
   highlightStyle: null,
   searchResults: [],
@@ -154,15 +157,16 @@ export const useViewerStore = create<ViewerState>((set) => ({
     }
   }),
   clearSelection: () => set({
-    selectedFeature: null,
-    selectedFeatureId: null,
-    selectedFeatures: [],
-    selectedFeatureIds: [],
-    serverHistory: [],
-    objectVersions: [],
-    highlightGeometry: null,
-    highlightStyle: null,
-  }),
+   selectedFeature: null,
+   selectedFeatureId: null,
+   selectedFeatures: [],
+   selectedFeatureIds: [],
+   serverHistory: [],
+   objectVersions: [],
+   objectSnapshots: [],
+   highlightGeometry: null,
+   highlightStyle: null,
+ }),
   setSelectedFeatureId: (id) => set({ selectedFeatureId: id }),
   setMouseCoords: (coords) => set({ mouseCoords: coords }),
   setSearchResults: (results) => set({ searchResults: results }),
@@ -222,6 +226,15 @@ export const useViewerStore = create<ViewerState>((set) => ({
       })
     } catch (e) {
       set({ objectVersions: [] })
+    }
+  },
+
+  fetchFeatureSnapshots: async (objectId: string) => {
+    try {
+      const snapshots = await apiService.getGeoObjectVersionSnapshots(objectId)
+      set({ objectSnapshots: snapshots || [] })
+    } catch (e) {
+      set({ objectSnapshots: [] })
     }
   },
 }))

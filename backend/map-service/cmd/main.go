@@ -52,6 +52,7 @@ func main() {
 	// Initialize repositories
 	geoObjectRepository := repository.NewGeoObjectRepository(db)
 	geoObjectHistoryRepository := repository.NewGeoObjectHistoryRepository(db)
+	geoObjectVersionRepository := repository.NewGeoObjectVersionRepository(db)
 	complaintRepository := repository.NewComplaintRepository(db)
 
 	// Initialize Redis cache
@@ -59,13 +60,15 @@ func main() {
 	defer redisCache.Close()
 
 	// Initialize services
-	geoObjectService := service.NewGeoObjectService(geoObjectRepository, geoObjectHistoryRepository, redisCache)
+	geoObjectVersionService := service.NewGeoObjectVersionService(geoObjectVersionRepository, geoObjectRepository)
+	geoObjectService := service.NewGeoObjectService(geoObjectRepository, geoObjectHistoryRepository, geoObjectVersionService, redisCache)
 	geoObjectHistoryService := service.NewGeoObjectHistoryService(geoObjectHistoryRepository, geoObjectRepository)
 	complaintService := service.NewComplaintService(complaintRepository, redisCache)
 
 	// Initialize handlers
 	geoObjectHandler := handler.NewGeoObjectHandler(geoObjectService)
 	geoObjectHistoryHandler := handler.NewGeoObjectHistoryHandler(geoObjectHistoryService)
+	geoObjectVersionHandler := handler.NewGeoObjectVersionHandler(geoObjectVersionService)
 	complaintHandler := handler.NewComplaintHandler(complaintService)
 
 	// Setup Gin router
@@ -83,7 +86,7 @@ func main() {
 			mapGroup.POST("/objects", geoObjectHandler.Create)
 			mapGroup.GET("/objects", geoObjectHandler.GetAll)
 			mapGroup.GET("/objects/:id", geoObjectHandler.GetByID)
-			mapGroup.GET("/objects/:base_id/versions", geoObjectHandler.GetVersions)
+			mapGroup.GET("/versions/:base_id", geoObjectHandler.GetVersions)
 			mapGroup.PUT("/objects/:id", geoObjectHandler.Update)
 			mapGroup.DELETE("/objects/:id", geoObjectHandler.Delete)
 			mapGroup.GET("/tiles/:z/:x/:y.pbf", geoObjectHandler.GetTile)
@@ -91,6 +94,11 @@ func main() {
 			// History routes
 			mapGroup.GET("/objects/:id/history", geoObjectHistoryHandler.GetByObjectID)
 			mapGroup.POST("/history/:historyId/rollback", geoObjectHistoryHandler.Rollback)
+
+			// Version routes
+			mapGroup.GET("/object-versions/:id", geoObjectVersionHandler.GetByGeoObjectID)
+			mapGroup.POST("/object-versions/:id", geoObjectVersionHandler.Create)
+			mapGroup.POST("/object-versions/:id/current", geoObjectVersionHandler.CreateFromCurrent)
 
 			// Statistics
 			mapGroup.GET("/stats", complaintHandler.GetStats)
