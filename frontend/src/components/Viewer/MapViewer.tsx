@@ -45,7 +45,7 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
     const map = useMap()
     const animated = useRef(false)
     const setMouseCoords = useViewerStore((s) => s.setMouseCoords)
-    const { activeTool, setSelectedFeature, fetchFeatureHistory, setActiveTool, setHighlight } = useViewerStore()
+    const { activeTool, setSelectedFeature, toggleSelectedFeature, fetchFeatureHistory, setActiveTool, setHighlight } = useViewerStore()
     const clearHighlight = useViewerStore((s) => s.clearHighlight)
 
     // Refs for latest values (avoid re-registering event handlers)
@@ -189,7 +189,7 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
     }, [setSelectedFeature, clearHighlight])
 
     // ─── Pick object: direct ID if available, bbox fallback (like editor) ──
-    const pickObject = useCallback(async (latlng: L.LatLng, featureProps?: any) => {
+    const pickObject = useCallback(async (latlng: L.LatLng, featureProps?: any, isShiftSelect: boolean = false) => {
         let obj: any = null
 
         try {
@@ -231,11 +231,15 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
                 return
             }
 
-            setSelectedFeature(viewerFeature)
+            if (isShiftSelect) {
+                toggleSelectedFeature(viewerFeature)
+            } else {
+                setSelectedFeature(viewerFeature)
+                await fetchFeatureHistory(obj.id)
+            }
             setHighlight(viewerFeature.geometry, {
                 color: '#ff4500', fillColor: '#ff4500', weight: 4, fillOpacity: 0.25,
             })
-            await fetchFeatureHistory(obj.id)
         } catch (err) {
             console.error('Viewer Pick failed:', err)
         }
@@ -259,7 +263,8 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
             if (!e.featureProperties && e.originalEvent?._featureHandled) return
             // History, complaint, select — pick object (ID fast path + bbox fallback)
             if (tool === 'select' || tool === 'history' || tool === 'complaint') {
-                pickObject(e.latlng, e.featureProperties)
+                const isShiftSelect = e.originalEvent?.shiftKey
+                pickObject(e.latlng, e.featureProperties, isShiftSelect)
             }
         }
 
@@ -388,6 +393,7 @@ const SearchResultsOverlay = () => {
     const layersRef = useRef<L.Layer[]>([])
     const searchResults = useViewerStore((s) => s.searchResults)
     const setSelectedFeature = useViewerStore((s) => s.setSelectedFeature)
+    const toggleSelectedFeature = useViewerStore((s) => s.toggleSelectedFeature)
     const setHighlight = useViewerStore((s) => s.setHighlight)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
 
@@ -425,11 +431,16 @@ const SearchResultsOverlay = () => {
             geoLayer.eachLayer(l => {
                 l.on('click', (e: any) => {
                     L.DomEvent.stopPropagation(e)
-                    setSelectedFeature(f)
+                    const isShiftSelect = e.originalEvent?.shiftKey
+                    if (isShiftSelect) {
+                        toggleSelectedFeature(f)
+                    } else {
+                        setSelectedFeature(f)
+                        fetchFeatureHistory(f.backendId || f.id)
+                    }
                     setHighlight(f.geometry, {
                         color: '#ff4500', fillColor: '#ff4500', weight: 4, fillOpacity: 0.25,
                     })
-                    fetchFeatureHistory(f.backendId || f.id)
                 })
                 l.addTo(map)
                 layersRef.current.push(l)

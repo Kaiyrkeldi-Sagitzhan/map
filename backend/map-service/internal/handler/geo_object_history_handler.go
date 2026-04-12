@@ -45,7 +45,18 @@ func (h *GeoObjectHistoryHandler) GetByObjectID(c *gin.Context) {
 		}
 	}
 
-	history, err := h.service.GetByObjectID(c.Request.Context(), obj.BaseID, limit)
+	objectID := obj.BaseID
+	if objectID == uuid.Nil {
+		if parsed, err := uuid.Parse(obj.ID); err == nil {
+			objectID = parsed
+		} else {
+			log.Printf("[ERROR] Invalid object ID format: %s", obj.ID)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid object id format"})
+			return
+		}
+	}
+
+	history, err := h.service.GetByObjectID(c.Request.Context(), objectID, limit)
 	if err != nil {
 		log.Printf("[ERROR] Failed to get history for object %s: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve history"})

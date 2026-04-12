@@ -105,13 +105,16 @@ export const useViewerStore = create<ViewerState>((set) => ({
     selectedFeatureId: feature?.id || null,
     selectedFeatures: feature ? [feature] : [],
     selectedFeatureIds: feature ? [feature.id] : [],
-    ...(feature ? {} : { serverHistory: [], highlightGeometry: null, highlightStyle: null }),
+    ...(feature ? { serverHistory: [], objectVersions: [], objectSnapshots: [] } : { serverHistory: [], objectVersions: [], objectSnapshots: [], highlightGeometry: null, highlightStyle: null }),
   })),
   setPrimarySelectedFeature: (feature) => set((state) => {
     if (!feature) {
       return {
         selectedFeature: null,
         selectedFeatureId: null,
+        serverHistory: [],
+        objectVersions: [],
+        objectSnapshots: [],
       }
     }
 
@@ -124,12 +127,18 @@ export const useViewerStore = create<ViewerState>((set) => ({
         selectedFeatureId: feature.id,
         selectedFeatures: [feature],
         selectedFeatureIds: [feature.id],
+        serverHistory: [],
+        objectVersions: [],
+        objectSnapshots: [],
       }
     }
 
     return {
       selectedFeature: feature,
       selectedFeatureId: feature.id,
+      serverHistory: [],
+      objectVersions: [],
+      objectSnapshots: [],
     }
   }),
   toggleSelectedFeature: (feature) => set((state) => {
@@ -141,19 +150,22 @@ export const useViewerStore = create<ViewerState>((set) => ({
       const nextPrimary = nextSelectedFeatures[nextSelectedFeatures.length - 1] || null
       return {
         selectedFeatures: nextSelectedFeatures,
-        selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
+        selectedFeatureIds: nextSelectedFeatures.map((f) => f.backendId || f.id),
         selectedFeature: nextPrimary,
         selectedFeatureId: nextPrimary?.id || null,
-        ...(nextPrimary ? {} : { serverHistory: [], highlightGeometry: null, highlightStyle: null }),
+        ...(nextPrimary ? { serverHistory: [], objectVersions: [], objectSnapshots: [] } : { serverHistory: [], objectVersions: [], objectSnapshots: [], highlightGeometry: null, highlightStyle: null }),
       }
     }
 
     const nextSelectedFeatures = [...state.selectedFeatures, feature]
     return {
       selectedFeatures: nextSelectedFeatures,
-      selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
+      selectedFeatureIds: nextSelectedFeatures.map((f) => f.backendId || f.id),
       selectedFeature: feature,
       selectedFeatureId: feature.id,
+      serverHistory: [],
+      objectVersions: [],
+      objectSnapshots: [],
     }
   }),
   clearSelection: () => set({

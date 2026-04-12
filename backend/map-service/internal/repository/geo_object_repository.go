@@ -121,9 +121,15 @@ func extractGeometryJSON(geometry []byte) (json.RawMessage, error) {
 }
 
 // GetByID retrieves a geo object by ID
-func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.GeoObjectWithGeometry, error) {
+func (r *GeoObjectRepository) GetByID(ctx context.Context, id string) (*model.GeoObjectWithGeometry, error) {
+	// Parse string ID to UUID
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
 	query := `
-		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, 
+		SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata,
 		       ST_AsGeoJSON(geometry) as geometry, created_at, updated_at
 		FROM geo_objects
 		WHERE id = $1
@@ -131,7 +137,7 @@ func (r *GeoObjectRepository) GetByID(ctx context.Context, id uuid.UUID) (*model
 
 	var obj model.GeoObjectWithGeometry
 	var geometryDB []byte
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err = r.db.QueryRowContext(ctx, query, uuidID).Scan(
 		&obj.ID,
 		&obj.OwnerID,
 		&obj.Scope,
@@ -382,9 +388,15 @@ func (r *GeoObjectRepository) Update(ctx context.Context, obj *model.GeoObject) 
 }
 
 // Delete deletes a geo object from the database
-func (r *GeoObjectRepository) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *GeoObjectRepository) Delete(ctx context.Context, id string) error {
+	// Parse string ID to UUID
+	uuidID, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+
 	query := `DELETE FROM geo_objects WHERE id = $1`
-	result, err := r.db.ExecContext(ctx, query, id)
+	result, err := r.db.ExecContext(ctx, query, uuidID)
 	if err != nil {
 		return err
 	}

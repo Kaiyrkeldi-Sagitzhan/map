@@ -74,31 +74,6 @@ func (h *GeoObjectVersionHandler) Create(c *gin.Context) {
 
 // RollbackToVersion handles POST /api/map/objects/:id/versions/rollback
 func (h *GeoObjectVersionHandler) RollbackToVersion(c *gin.Context) {
-	geoObjectIDStr := c.Param("id")
-	geoObjectID, err := uuid.Parse(geoObjectIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid object ID"})
-		return
-	}
-
-	var req dto.RollbackToVersionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	userIDInterface, _ := c.Get("user_id")
-	var userID uuid.UUID
-	switch v := userIDInterface.(type) {
-	case uuid.UUID:
-		userID = v
-	case string:
-		userID, _ = uuid.Parse(v)
-	}
-
-	isAdminInterface, _ := c.Get("is_admin")
-	isAdmin, _ := isAdminInterface.(bool)
-
 	// Note: This handler is for versions, but rollback is in GeoObjectService
 	// We need to call the geo object service, but this handler only has version service
 	// This is a design issue. For now, we'll assume the rollback is handled elsewhere.

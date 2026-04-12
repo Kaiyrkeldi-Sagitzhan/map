@@ -8,20 +8,19 @@ import { getSafeLabel, getSafeStyle } from '../../types/editor'
 import type { FeatureClass, ClassStyle } from '../../types/editor'
 import { saveAs } from 'file-saver'
 import { apiService } from '../../services/api'
-import { 
-    X, 
-    Save, 
-    Box, 
-    Download, 
-    Copy, 
-    Trash2, 
-    ChevronDown, 
-    Type, 
-    Layers, 
-    Settings2, 
+import {
+    X,
+    Save,
+    Box,
+    Download,
+    Copy,
+    Trash2,
+    ChevronDown,
+    Type,
+    Layers,
+    Settings2,
     Activity,
-    CheckCircle2,
-    ChevronRight
+    CheckCircle2
 } from 'lucide-react'
 import { FEATURE_SCHEMAS } from '../../types/schema'
 
@@ -29,29 +28,15 @@ const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'bui
 
 export default function PropertiesPanel() {
     const selectedFeatureId = useEditorStore((s) => s.selectedFeatureId)
-    const selectedFeatureIds = useEditorStore((s) => s.selectedFeatureIds)
     const features = useEditorStore((s) => s.features)
     const updateFeature = useEditorStore((s) => s.updateFeature)
     const updateFeatureMetadata = useEditorStore((s) => s.updateFeatureMetadata)
     const deleteFeature = useEditorStore((s) => s.deleteFeature)
     const duplicateFeature = useEditorStore((s) => s.duplicateFeature)
     const setSelectedFeature = useEditorStore((s) => s.setSelectedFeature)
-    const clearSelection = useEditorStore((s) => s.clearSelection)
     const isGeometryDirty = useEditorStore((s) => s.isGeometryDirty)
     const setGeometryDirty = useEditorStore((s) => s.setGeometryDirty)
     const fetchFeatureHistory = useEditorStore((s) => s.fetchFeatureHistory)
-
-    // Track which features are expanded in multi-select view
-    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-
-    const toggleExpanded = (id: string) => {
-        setExpandedIds(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-        })
-    }
 
     // Single-select view hooks
     // Don't use useMemo for simple find - it causes dependency issues with array reference changes
@@ -160,33 +145,6 @@ export default function PropertiesPanel() {
         saveAs(new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' }), `${feature.name}.geojson`)
     }
 
-    // Multi-select view for when multiple objects are selected
-    if (selectedFeatureIds.length > 1) {
-        const selectedFeatures = features.filter(f => selectedFeatureIds.includes(f.id))
-        
-        return (
-            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
-                <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
-                        <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Выбрано: {selectedFeatureIds.length}</h2>
-                    </div>
-                    <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-2">
-                    {selectedFeatures.map((f) => (
-                        <MultiSelectItem
-                            key={f.id}
-                            feature={f}
-                            isExpanded={expandedIds.has(f.id)}
-                            onToggleExpand={() => toggleExpanded(f.id)}
-                        />
-                    ))}
-                </div>
-            </div>
-        )
-    }
 
     // Empty state view
     if (!feature) return (
@@ -414,176 +372,6 @@ export default function PropertiesPanel() {
     )
 }
 
-interface MultiSelectItemProps {
-    feature: any
-    isExpanded: boolean
-    onToggleExpand: () => void
-}
-
-function MultiSelectItem({ feature, isExpanded, onToggleExpand }: MultiSelectItemProps) {
-    // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL LOGIC
-    const updateFeature = useEditorStore((s) => s.updateFeature)
-    const deleteFeature = useEditorStore((s) => s.deleteFeature)
-    const fetchFeatureHistory = useEditorStore((s) => s.fetchFeatureHistory)
-
-    const [name, setName] = useState(feature?.name || '')
-    const [description, setDescription] = useState(feature?.description || '')
-    const [fc, setFc] = useState<FeatureClass>(feature?.featureClass || 'custom')
-    const [style, setStyle] = useState<ClassStyle>(feature?.style || { color: '#000', fillColor: '#000', weight: 2, fillOpacity: 0.3 })
-    const [isDirty, setIsDirty] = useState(false)
-    const [saveFlash, setSaveFlash] = useState(false)
-
-    // NOW we can do early return after all hooks
-    if (!feature) {
-        console.error('[MultiSelectItem] Feature is null/undefined!')
-        return null
-    }
-
-    const markDirty = () => setIsDirty(true)
-
-    const handleClassChange = (newFc: FeatureClass) => {
-        const newStyle = { ...getSafeStyle(newFc) }
-        setFc(newFc)
-        setStyle(newStyle)
-        markDirty()
-    }
-
-    const handleStyleChange = (key: keyof ClassStyle, value: string | number) => {
-        setStyle(prev => ({ ...prev, [key]: value }))
-        markDirty()
-    }
-
-    const handleSave = async () => {
-        try {
-            const patch: Partial<typeof feature> = { name, description, style, featureClass: fc }
-            updateFeature(feature.id, patch)
-
-            await apiService.updateGeoObject(feature.backendId || feature.id, {
-                name,
-                description,
-                type: fc as any,
-                metadata: { ...feature.metadata, style },
-                geometry: feature.geometry
-            })
-
-            setIsDirty(false)
-            setSaveFlash(true)
-            await fetchFeatureHistory(feature.backendId || feature.id)
-            window.dispatchEvent(new Event('refresh-map'))
-            setTimeout(() => setSaveFlash(false), 2000)
-        } catch (err) {
-            console.error('Save failed:', err)
-        }
-    }
-
-    const handleDelete = () => {
-        if (confirm('Удалить объект?')) {
-            if (feature.backendId) apiService.deleteGeoObject(feature.backendId).catch(console.error)
-            deleteFeature(feature.id)
-        }
-    }
-
-    return (
-        <div className="bg-white/[0.03] border border-white/5 rounded-xl overflow-hidden">
-            <button
-                onClick={() => {
-                    
-                    onToggleExpand()
-                }}
-                className="w-full flex items-center justify-between p-3 hover:bg-white/[0.08] transition-all"
-            >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <ChevronRight 
-                        size={14} 
-                        className={`text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-white truncate">{name || 'Без названия'}</p>
-                        <p className="text-[8px] text-slate-500">{fc}</p>
-                    </div>
-                </div>
-            </button>
-
-            {isExpanded && (
-                <div className="border-t border-white/5 px-3 py-3 space-y-3 max-h-80 overflow-y-auto">
-                    <div>
-                        <label className="flex items-center gap-1.5 text-[8px] font-bold text-white/70 uppercase mb-1">
-                            <Type size={10} /> Название
-                        </label>
-                        <input 
-                            className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#10B981]/50"
-                            value={name} 
-                            onChange={(e) => { setName(e.target.value); markDirty() }}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-1.5 text-[8px] font-bold text-white/70 uppercase mb-1">
-                            <Type size={10} /> Описание
-                        </label>
-                        <textarea 
-                            className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#10B981]/50 resize-none"
-                            rows={2}
-                            value={description} 
-                            onChange={(e) => { setDescription(e.target.value); markDirty() }}
-                            placeholder="Введите описание..."
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-1.5 text-[8px] font-bold text-white/70 uppercase mb-1">
-                            <Layers size={10} /> Вип
-                        </label>
-                        <select 
-                            value={fc} 
-                            onChange={(e) => handleClassChange(e.target.value as FeatureClass)}
-                            className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white appearance-none cursor-pointer"
-                        >
-                            {FEATURE_CLASSES.map((c) => (<option key={c} value={c} className="bg-[#0A192F]">{getSafeLabel(c)}</option>))}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="text-[8px] font-bold text-white/70 uppercase block mb-2">Оформление</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="text-[7px] text-slate-500 block mb-1">Контур</label>
-                                <input type="color" value={style.color} onChange={(e) => handleStyleChange('color', e.target.value)} className="w-full h-6 rounded border border-white/20 cursor-pointer" />
-                            </div>
-                            <div>
-                                <label className="text-[7px] text-slate-500 block mb-1">Заливка</label>
-                                <input type="color" value={style.fillColor} onChange={(e) => handleStyleChange('fillColor', e.target.value)} className="w-full h-6 rounded border border-white/20 cursor-pointer" />
-                            </div>
-                            <div>
-                                <label className="text-[7px] text-slate-500 block mb-1">Толщина</label>
-                                <input type="number" min="0.5" max="10" step="0.5" value={style.weight} onChange={(e) => handleStyleChange('weight', parseFloat(e.target.value))} className="w-full text-xs bg-white/[0.03] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-[#10B981]/50" />
-                            </div>
-                            <div>
-                                <label className="text-[7px] text-slate-500 block mb-1">Прозрачность</label>
-                                <input type="number" min="0" max="1" step="0.1" value={style.fillOpacity} onChange={(e) => handleStyleChange('fillOpacity', parseFloat(e.target.value))} className="w-full text-xs bg-white/[0.03] border border-white/10 rounded px-2 py-1 text-white focus:outline-none focus:border-[#10B981]/50" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={handleSave}
-                            disabled={!isDirty}
-                            className={`flex-1 px-2 py-1.5 text-[7px] font-bold rounded transition-all ${
-                                saveFlash ? 'bg-emerald-500 text-black' : isDirty ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-white/5 text-slate-600'
-                            }`}
-                        >
-                            {saveFlash ? '✓' : 'Сохр'}
-                        </button>
-                        <button onClick={handleDelete} className="flex-1 px-2 py-1.5 text-[7px] font-bold rounded bg-red-500/10 text-red-400 hover:bg-red-500/20">
-                            Удал
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    )
-}
 
 function formatAreaKm2(value: unknown): string | null {
     const n = typeof value === 'number' ? value : Number(value)

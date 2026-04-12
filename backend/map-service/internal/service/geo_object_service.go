@@ -424,9 +424,18 @@ func (s *GeoObjectService) Update(ctx context.Context, id string, userID uuid.UU
 	if !isNew && s.historyRepo != nil {
 		beforeSnap := buildSnapshot(existing)
 		afterSnap := buildSnapshot(updated)
+		objectID := existing.BaseID
+		if objectID == uuid.Nil {
+			if parsed, err := uuid.Parse(existing.ID); err == nil {
+				objectID = parsed
+			} else {
+				log.Printf("[WARN] Invalid object ID format for history: %s", existing.ID)
+				objectID = existing.BaseID
+			}
+		}
 		historyEntry := &model.GeoObjectHistory{
 			ID:             uuid.New(),
-			ObjectID:       existing.BaseID,
+			ObjectID:       objectID,
 			UserID:         userID,
 			Action:         "update",
 			Description:    fmt.Sprintf("Изменён объект \"%s\"", updated.Name),
@@ -472,7 +481,7 @@ func (s *GeoObjectService) Delete(ctx context.Context, id uuid.UUID, userID uuid
 		return ErrAccessDenied
 	}
 
-	err = s.repo.Delete(ctx, id)
+	err = s.repo.Delete(ctx, id.String())
 	if err == nil && s.cache != nil {
 		_ = s.cache.InvalidateLists(ctx)
 		_ = s.cache.InvalidateTiles(ctx)
@@ -527,10 +536,16 @@ func (s *GeoObjectService) RollbackToVersion(ctx context.Context, baseID uuid.UU
 		return nil, err
 	}
 
+	// Get the updated object
+	updated, err := s.repo.GetByID(ctx, baseID.String())
+	if err != nil {
+		return nil, err
+	}
+
 	// Record history
 	if s.historyRepo != nil {
 		beforeSnap := buildSnapshot(current)
-		afterSnap := buildSnapshot(rolledBack)
+		afterSnap := buildSnapshot(updated)
 		historyEntry := &model.GeoObjectHistory{
 			ID:             uuid.New(),
 			ObjectID:       baseID,
@@ -553,7 +568,7 @@ func (s *GeoObjectService) RollbackToVersion(ctx context.Context, baseID uuid.UU
 		_ = s.cache.InvalidateStats(ctx)
 	}
 
-	resp := toResponse(rolledBack)
+	resp := toResponse(updated)
 	return &resp, nil
 }
 
