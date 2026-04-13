@@ -8,6 +8,7 @@ import type { DrawTool, FeatureClass } from '../../types/editor'
 import { CLASS_LABELS, CLASS_STYLES } from '../../types/editor'
 import { 
     MousePointer2, 
+    Ruler,
     Hexagon, 
     Square, 
     Circle, 
@@ -35,6 +36,11 @@ const tools: ToolDef[] = [
         id: 'select',
         label: 'Выделение (V)',
         icon: <MousePointer2 size={18} />,
+    },
+    {
+        id: 'measure',
+        label: 'Линейка (D)',
+        icon: <Ruler size={18} />,
     },
     {
         id: 'drawPolygon',
@@ -83,7 +89,7 @@ const tools: ToolDef[] = [
     },
 ]
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'other', 'custom']
 
 export default function Toolbar() {
     const { currentTool, setTool, featureClass, setFeatureClass, showMap, setShowMap } = useEditorStore()
@@ -119,6 +125,7 @@ export default function Toolbar() {
 
             switch (e.key.toLowerCase()) {
                 case 'v': setTool('select'); break
+                case 'd': setTool('measure'); break
                 case 'p': setTool('drawPolygon'); break
                 case 'r': setTool('drawRectangle'); break
                 case 'o': setTool('drawCircle'); break

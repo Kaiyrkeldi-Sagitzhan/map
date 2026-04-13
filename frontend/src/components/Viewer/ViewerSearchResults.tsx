@@ -54,20 +54,26 @@ export default function ViewerSearchResults() {
     }
 
     return (
-        <div className={`fixed left-6 z-[1000] w-[300px] bg-[#020C1B]/95 backdrop-blur-3xl rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col pointer-events-auto transition-all duration-300 ${isCollapsed ? 'top-[calc(7rem+40vh+12px)] h-10' : 'top-[calc(7rem+40vh+12px)] max-h-[40vh]'}`}>
+        <div className={`fixed left-6 z-[1000] bg-[#020C1B]/95 backdrop-blur-3xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 flex flex-col pointer-events-auto transition-all duration-300 ${isCollapsed ? 'top-[calc(7rem+40vh+12px)] w-12 h-12 rounded-xl' : 'top-[calc(7rem+40vh+12px)] w-[300px] max-h-[40vh] rounded-2xl'}`}>
             {/* Header */}
-            <div className="px-5 py-3 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+            <div className={`${isCollapsed ? 'p-0 h-full border-none' : 'px-5 py-3 border-b border-white/5 bg-white/[0.02]'} flex items-center justify-between`}>
                 <button
                     onClick={() => setIsCollapsed((v) => !v)}
-                    className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] flex items-center gap-2 hover:text-white transition-colors"
+                    className={`${isCollapsed ? 'w-full h-full flex items-center justify-center text-slate-300 hover:text-white' : 'text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] flex items-center gap-2 hover:text-white'} transition-colors`}
                 >
-                    <ChevronRight className={`w-3 h-3 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-                    <Search className="w-3 h-3" />
-                    Найдено: {filteredResults.length}
+                    {isCollapsed ? (
+                        <Search className="w-4 h-4 text-[#10B981]" />
+                    ) : (
+                        <>
+                            <ChevronRight className={`w-3 h-3 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+                            <Search className="w-3 h-3" />
+                            Найдено: {filteredResults.length}
+                        </>
+                    )}
                 </button>
                 <button
                     onClick={clearSearchResults}
-                    className="p-1.5 hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-colors"
+                    className={`${isCollapsed ? 'hidden' : 'p-1.5'} hover:bg-white/10 rounded-lg text-slate-500 hover:text-white transition-colors`}
                 >
                     <X size={14} />
                 </button>

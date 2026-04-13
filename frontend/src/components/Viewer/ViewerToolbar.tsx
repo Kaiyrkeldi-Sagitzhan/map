@@ -6,6 +6,7 @@ import { useViewerStore } from '../../store/viewerStore'
 import { getSafeStyle } from '../../types/editor'
 import {
     MousePointer2,
+    Ruler,
     Focus,
     History,
     AlertCircle,
@@ -68,6 +69,7 @@ export default function ViewerToolbar() {
             {/* Main toolbar pill */}
             <div className="flex items-center gap-0.5 bg-[#020C1B]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
                 {toolBtn('select', <MousePointer2 size={18} />, 'Выделение')}
+                {toolBtn('measure', <Ruler size={18} />, 'Линейка (ПКМ или ESC — сброс)')}
                 {toolBtn('searchArea', <Focus size={18} />, 'Область поиска (Shift — прямоугольник)')}
                 {toolBtn('history', <History size={18} />, 'История объекта')}
 
@@ -153,6 +155,11 @@ export default function ViewerToolbar() {
             {activeTool === 'searchArea' && (
                 <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap px-4 py-2 bg-[#10B981]/90 text-[#020C1B] rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
                     Кликайте для полигона · Shift+drag для прямоугольника · Dbl-click завершить
+                </div>
+            )}
+            {activeTool === 'measure' && (
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap px-4 py-2 bg-[#10B981]/90 text-[#020C1B] rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    Кликайте по точкам · ПКМ или ESC сброс
                 </div>
             )}
         </div>

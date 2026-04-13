@@ -233,6 +233,20 @@ export default function PropertiesPanel() {
     // Multi-select view for when multiple objects are selected
     if (selectedFeatureIds.length > 1) {
         const selectedFeatures = features.filter(f => selectedFeatureIds.includes(f.id))
+
+        if (isCollapsed) {
+            return (
+                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
+                    <button
+                        onClick={() => setIsCollapsed(false)}
+                        className="w-full h-full flex items-center justify-center text-[#10B981] hover:text-white transition-colors"
+                        title="Открыть инспектор"
+                    >
+                        <Box size={16} />
+                    </button>
+                </div>
+            )
+        }
         
         return (
             <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
@@ -241,7 +255,10 @@ export default function PropertiesPanel() {
                         <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
                         <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Выбрано: {selectedFeatureIds.length}</h2>
                     </div>
-                    <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
+                    <div className="flex items-center gap-1">
+                        <button onClick={() => setIsCollapsed(true)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} /></button>
+                        <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-2">
@@ -259,37 +276,62 @@ export default function PropertiesPanel() {
     }
 
     // Empty state view
-    if (!feature) return (
-        <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
-                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Свойства объекта</h2>
-            </div>
-            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center animate-in fade-in duration-500">
-                <div className="w-20 h-20 rounded-[32px] bg-[#10B981]/5 flex items-center justify-center mb-6 border border-[#10B981]/10">
-                    <Box size={32} className="text-[#10B981]/20" />
+    if (!feature) {
+        if (isCollapsed) {
+            return (
+                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
+                    <button
+                        onClick={() => setIsCollapsed(false)}
+                        className="w-full h-full flex items-center justify-center text-[#10B981] hover:text-white transition-colors"
+                        title="Открыть инспектор"
+                    >
+                        <Box size={16} />
+                    </button>
                 </div>
-                <p className="text-sm font-bold text-slate-200 mb-2">Объект не выбран</p>
-                <p className="text-[11px] text-slate-500 leading-relaxed max-w-[180px]">Выберите элемент на карте или в списке слоев, чтобы редактировать его</p>
+            )
+        }
+
+        return (
+            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
+                    <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Свойства объекта</h2>
+                    <button onClick={() => setIsCollapsed(true)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} /></button>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center px-8 text-center animate-in fade-in duration-500">
+                    <div className="w-20 h-20 rounded-[32px] bg-[#10B981]/5 flex items-center justify-center mb-6 border border-[#10B981]/10">
+                        <Box size={32} className="text-[#10B981]/20" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-200 mb-2">Объект не выбран</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed max-w-[180px]">Выберите элемент на карте или в списке слоев, чтобы редактировать его</p>
+                </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     return (
         <>
-        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px] transition-all duration-300 ${isCollapsed ? 'h-14 w-14' : 'bottom-28 w-[320px]'}`}>
+        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'bottom-28 w-[320px] rounded-[24px]'}`}>
+            {isCollapsed ? (
+                <button
+                    onClick={() => setIsCollapsed(false)}
+                    className="w-full h-full flex items-center justify-center text-[#10B981] hover:text-white transition-colors"
+                    title="Открыть инспектор"
+                >
+                    <Box size={16} />
+                </button>
+            ) : (
+            <>
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]" />
-                    {!isCollapsed && <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>}
+                    <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Инспектор</h2>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button onClick={() => setIsCollapsed((v) => !v)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} className={`transition-transform ${isCollapsed ? 'rotate-180' : ''}`} /></button>
-                    {!isCollapsed && <button onClick={handleClose} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>}
+                    <button onClick={() => setIsCollapsed(true)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} /></button>
+                    <button onClick={handleClose} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
                 </div>
             </div>
 
-            {!isCollapsed && (
-            <>
             <div className="px-4 pt-3">
                 <div className="flex bg-black/40 rounded-xl p-1">
                     <button
