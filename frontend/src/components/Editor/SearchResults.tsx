@@ -32,17 +32,23 @@ const SearchResults: React.FC = () => {
     }
 
     return (
-        <div className={`fixed left-6 z-[1000] w-[300px] bg-[#0A192F]/95 backdrop-blur-xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/[0.06] flex flex-col pointer-events-auto transition-all duration-300 ${isCollapsed ? 'top-[calc(7rem+40vh+12px)] h-10' : 'top-[calc(7rem+40vh+12px)] max-h-[40vh]'}`}>
-            <div className="p-3 border-b border-white/5 flex items-center justify-between">
+        <div className={`fixed left-6 z-[1000] bg-[#0A192F]/95 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/[0.06] flex flex-col pointer-events-auto transition-all duration-300 ${isCollapsed ? 'top-[calc(7rem+40vh+12px)] w-12 h-12 rounded-xl' : 'top-[calc(7rem+40vh+12px)] w-[300px] max-h-[40vh] rounded-2xl'}`}>
+            <div className={`${isCollapsed ? 'p-0 h-full border-none' : 'p-3 border-b border-white/5'} flex items-center justify-between`}>
                 <button
                     onClick={() => setIsCollapsed((v) => !v)}
-                    className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] hover:text-slate-300 transition-colors"
+                    className={`${isCollapsed ? 'w-full h-full flex items-center justify-center text-slate-300 hover:text-white' : 'flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] hover:text-slate-300'} transition-colors`}
                 >
-                    <ChevronRight className={`w-3 h-3 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-                    <Search className="w-3 h-3" />
-                    <span>Найдено {filteredResults.length}</span>
+                    {isCollapsed ? (
+                        <Search className="w-4 h-4 text-[#10B981]" />
+                    ) : (
+                        <>
+                            <ChevronRight className={`w-3 h-3 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+                            <Search className="w-3 h-3" />
+                            <span>Найдено {filteredResults.length}</span>
+                        </>
+                    )}
                 </button>
-                <button onClick={clearSearchResults} className="p-1 hover:bg-white/10 rounded-lg text-slate-500 transition-colors">
+                <button onClick={clearSearchResults} className={`${isCollapsed ? 'hidden' : 'p-1'} hover:bg-white/10 rounded-lg text-slate-500 transition-colors`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                     </svg>

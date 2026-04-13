@@ -24,17 +24,23 @@ export default function ViewerLayersPanel() {
     }, [searchResults])
 
     return (
-        <div className={`fixed top-28 left-6 z-[500] w-[300px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px] transition-all duration-300 ${isCollapsed ? 'h-14' : 'h-[40vh]'}`}>
-            <div className="p-3 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+        <div className={`fixed top-28 left-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'w-[300px] h-[40vh] rounded-[24px]'}`}>
+            <div className={`${isCollapsed ? 'p-0 h-full border-none' : 'p-3 border-b border-white/5 bg-white/[0.02]'} flex items-center justify-between`}>
                 <button
                     onClick={() => setIsCollapsed((v) => !v)}
-                    className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] hover:text-white transition-colors"
+                    className={`${isCollapsed ? 'w-full h-full flex items-center justify-center text-slate-300 hover:text-white' : 'flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] hover:text-white'} transition-colors`}
                 >
-                    <ChevronRight size={14} className={`transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-                    <Layers size={14} className="text-[#10B981]" />
-                    Слои
+                    {isCollapsed ? (
+                        <Layers size={16} className="text-[#10B981]" />
+                    ) : (
+                        <>
+                            <ChevronRight size={14} className={`transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+                            <Layers size={14} className="text-[#10B981]" />
+                            Слои
+                        </>
+                    )}
                 </button>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{searchResults.length} найдено</span>
+                <span className={`${isCollapsed ? 'hidden' : 'text-[10px] font-bold text-slate-500 uppercase tracking-wider'}`}>{searchResults.length} найдено</span>
             </div>
 
             {!isCollapsed && (

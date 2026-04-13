@@ -47,7 +47,7 @@ interface ViewerState {
   mouseCoords: MouseCoords | null
   showMap: boolean
   mapOpacity: number
-  activeTool: 'select' | 'searchArea' | 'history' | 'complaint'
+  activeTool: 'select' | 'measure' | 'searchArea' | 'history' | 'complaint'
 
   // Layer visibility (multi-select)
   visibleLayers: Set<string>
@@ -68,7 +68,7 @@ interface ViewerState {
   fetchFeatureHistory: (objectId: string) => Promise<void>
   setShowMap: (v: boolean) => void
   setMapOpacity: (v: number) => void
-  setActiveTool: (tool: 'select' | 'searchArea' | 'history' | 'complaint') => void
+  setActiveTool: (tool: 'select' | 'measure' | 'searchArea' | 'history' | 'complaint') => void
   toggleLayerVisibility: (layerId: string) => void
   setHighlight: (geometry: any, style?: any) => void
   clearHighlight: () => void

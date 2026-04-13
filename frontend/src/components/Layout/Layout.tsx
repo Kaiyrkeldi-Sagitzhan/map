@@ -53,14 +53,14 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      {/* Floating Header Island */}
-      <header className={`fixed ${isImpersonating ? 'top-12' : 'top-4'} left-1/2 -translate-x-1/2 h-[60px] flex items-center justify-between px-8 w-[96%] max-w-[1800px] z-[1000] transition-all`}
+      {/* Header */}
+      <header className={`fixed ${isImpersonating ? 'top-8' : 'top-0'} left-0 right-0 h-[60px] flex items-center justify-between px-8 z-[1000] transition-all`}
         style={{
           background: 'rgba(2, 12, 27, 0.8)',
           backdropFilter: 'blur(40px)',
           WebkitBackdropFilter: 'blur(40px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '100px',
+          borderRadius: '0px',
           boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
         }}
       >
