@@ -231,7 +231,7 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
                 return
             }
 
-            if (isShiftSelect) {
+            if (additiveSelect) {
                 toggleSelectedFeature(viewerFeature)
             } else {
                 setSelectedFeature(viewerFeature)
@@ -263,8 +263,8 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
             if (!e.featureProperties && e.originalEvent?._featureHandled) return
             // History, complaint, select — pick object (ID fast path + bbox fallback)
             if (tool === 'select' || tool === 'history' || tool === 'complaint') {
-                const isShiftSelect = e.originalEvent?.shiftKey
-                pickObject(e.latlng, e.featureProperties, isShiftSelect)
+                const isShiftSelect = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey || isShiftHeld.current
+                pickObject(e.latlng, e.featureProperties, isShiftSelect && (tool === 'select' || tool === 'history'))
             }
         }
 
@@ -391,11 +391,27 @@ const HighlightOverlay = () => {
 const SearchResultsOverlay = () => {
     const map = useMap()
     const layersRef = useRef<L.Layer[]>([])
+    const isShiftHeldRef = useRef(false)
     const searchResults = useViewerStore((s) => s.searchResults)
     const setSelectedFeature = useViewerStore((s) => s.setSelectedFeature)
     const toggleSelectedFeature = useViewerStore((s) => s.toggleSelectedFeature)
     const setHighlight = useViewerStore((s) => s.setHighlight)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
+
+    useEffect(() => {
+        const down = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeldRef.current = true
+        }
+        const up = (e: KeyboardEvent) => {
+            if (e.key === 'Shift') isShiftHeldRef.current = false
+        }
+        window.addEventListener('keydown', down)
+        window.addEventListener('keyup', up)
+        return () => {
+            window.removeEventListener('keydown', down)
+            window.removeEventListener('keyup', up)
+        }
+    }, [])
 
     useEffect(() => {
         // Cleanup old layers
@@ -431,7 +447,7 @@ const SearchResultsOverlay = () => {
             geoLayer.eachLayer(l => {
                 l.on('click', (e: any) => {
                     L.DomEvent.stopPropagation(e)
-                    const isShiftSelect = e.originalEvent?.shiftKey
+                    const isShiftSelect = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey || isShiftHeldRef.current
                     if (isShiftSelect) {
                         toggleSelectedFeature(f)
                     } else {
@@ -451,7 +467,7 @@ const SearchResultsOverlay = () => {
             layersRef.current.forEach(l => map.removeLayer(l))
             layersRef.current = []
         }
-    }, [map, searchResults, setSelectedFeature, setHighlight, fetchFeatureHistory])
+    }, [map, searchResults, setSelectedFeature, toggleSelectedFeature, setHighlight, fetchFeatureHistory])
 
     return null
 }

@@ -28,12 +28,16 @@ const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'bui
 
 export default function PropertiesPanel() {
     const selectedFeatureId = useEditorStore((s) => s.selectedFeatureId)
+    const selectedFeatures = useEditorStore((s) => s.selectedFeatures)
+    const selectedFeatureIds = useEditorStore((s) => s.selectedFeatureIds)
     const features = useEditorStore((s) => s.features)
     const updateFeature = useEditorStore((s) => s.updateFeature)
     const updateFeatureMetadata = useEditorStore((s) => s.updateFeatureMetadata)
     const deleteFeature = useEditorStore((s) => s.deleteFeature)
     const duplicateFeature = useEditorStore((s) => s.duplicateFeature)
     const setSelectedFeature = useEditorStore((s) => s.setSelectedFeature)
+    const setPrimarySelectedFeature = useEditorStore((s) => s.setPrimarySelectedFeature)
+    const clearSelection = useEditorStore((s) => s.clearSelection)
     const isGeometryDirty = useEditorStore((s) => s.isGeometryDirty)
     const setGeometryDirty = useEditorStore((s) => s.setGeometryDirty)
     const fetchFeatureHistory = useEditorStore((s) => s.fetchFeatureHistory)
@@ -145,6 +149,33 @@ export default function PropertiesPanel() {
         saveAs(new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' }), `${feature.name}.geojson`)
     }
 
+
+    // Multiselect view
+    if (selectedFeatureIds.length > 1) {
+        return (
+            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
+                        <h2 className="text-[10px] font-bold text-slate-200 uppercase tracking-[0.2em]">Выбрано: {selectedFeatureIds.length}</h2>
+                    </div>
+                    <button onClick={clearSelection} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><X size={16} /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-4 pb-6 space-y-2">
+                    {selectedFeatures.map((feature) => {
+                        return (
+                            <EditorMultiSelectItem
+                                key={feature.id}
+                                feature={feature}
+                                onSelect={() => setPrimarySelectedFeature(feature)}
+                            />
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
 
     // Empty state view
     if (!feature) return (
@@ -387,4 +418,104 @@ function countCoords(coords: any): number {
     if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') return coords.length
     let count = 0; for (const c of coords) count += countCoords(c)
     return count
+}
+
+function EditorMultiSelectItem({
+    feature,
+    isExpanded,
+    onToggleExpand,
+    onSelect,
+}: {
+    feature: any
+    isExpanded: boolean
+    onToggleExpand: () => void
+    onSelect: () => void
+}) {
+    if (!feature) return null
+
+    const metadata = feature.metadata || {}
+    const style = feature.style || metadata.style
+    const schema = getFeatureSchema(feature)
+    const geomInfo = (() => {
+        if (!feature.geometry) return { type: 'Unknown', coordCount: 0 }
+        const g = feature.geometry
+        let count = 0
+        if ('coordinates' in g) count = countCoords(g.coordinates)
+        return { type: g.type, coordCount: count }
+    })()
+    const areaLabel = formatAreaKm2(feature?.metadata?.area_km2)
+
+    return (
+        <div className="bg-white/[0.03] border border-white/5 rounded-xl overflow-hidden">
+            <button
+                onClick={() => {
+                    onSelect()
+                    onToggleExpand()
+                }}
+                className="w-full flex items-center justify-between p-3 hover:bg-white/[0.08] transition-all"
+            >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <ChevronRight
+                        size={14}
+                        className={`text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                    />
+                    <div className="min-w-0 flex-1 text-left">
+                        <p className="text-[10px] font-bold text-white truncate">{feature.name || 'Без названия'}</p>
+                        <p className="text-[8px] text-slate-500">{FEATURE_CLASSES.find(c => c === feature.featureClass) ? getSafeLabel(feature.featureClass) : feature.featureClass}</p>
+                    </div>
+                </div>
+            </button>
+
+            {isExpanded && (
+                <div className="border-t border-white/5 px-3 py-3 space-y-3">
+                    <div>
+                        <label className="text-[8px] font-bold text-white/70 uppercase block mb-1">Название</label>
+                        <div className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-white">
+                            {feature.name || 'Без названия'}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[8px] font-bold text-white/70 uppercase block mb-1">Описание</label>
+                        <div className="w-full text-xs bg-white/[0.03] border border-white/10 rounded-lg px-2 py-1.5 text-slate-300">
+                            {feature.description || 'Нет описания'}
+                        </div>
+                    </div>
+
+                    {style && (
+                        <div>
+                            <label className="text-[8px] font-bold text-white/70 uppercase block mb-2">Оформление</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5">
+                                    <span className="text-[7px] text-slate-500 uppercase block mb-1">Контур</span>
+                                    <div className="w-6 h-6 rounded-full border border-white/20" style={{ backgroundColor: style.color || '#666' }} />
+                                </div>
+                                <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5">
+                                    <span className="text-[7px] text-slate-500 uppercase block mb-1">Заливка</span>
+                                    <div className="w-6 h-6 rounded-full border border-white/20" style={{ backgroundColor: style.fillColor || 'transparent' }} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5">
+                            <span className="text-[7px] text-slate-500 uppercase block mb-1">Тип</span>
+                            <span className="text-[10px] text-slate-200 font-mono font-bold uppercase">{geomInfo.type}</span>
+                        </div>
+                        <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5">
+                            <span className="text-[7px] text-slate-500 uppercase block mb-1">Вершины</span>
+                            <span className="text-[10px] text-slate-200 font-mono font-bold">{geomInfo.coordCount}</span>
+                        </div>
+                        {areaLabel && (
+                            <div className="bg-white/[0.03] rounded-lg p-2 border border-white/5 col-span-2">
+                                <span className="text-[7px] text-slate-500 uppercase block mb-1">Площадь</span>
+                                <span className="text-[10px] text-slate-200 font-mono font-bold">{areaLabel}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
 }

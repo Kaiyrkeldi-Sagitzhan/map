@@ -27,6 +27,8 @@ interface EditorState {
     // Features
     features: EditorFeature[]
     selectedFeatureId: string | null
+    selectedFeatures: EditorFeature[]
+    selectedFeatureIds: string[]
     
     // Search results (temporary view)
     searchResults: EditorFeature[]
@@ -53,6 +55,9 @@ interface EditorState {
     setTool: (tool: DrawTool) => void
     setFeatureClass: (fc: FeatureClass) => void
     setSelectedFeature: (id: string | null) => void
+    setPrimarySelectedFeature: (feature: EditorFeature | null) => void
+    toggleSelectedFeature: (feature: EditorFeature) => void
+    clearSelection: () => void
     setSelectedFeatureById: (backendId: string) => Promise<void>
     setMouseCoords: (coords: MouseCoords | null) => void
     setShowMap: (show: boolean) => void
@@ -118,6 +123,8 @@ export const useEditorStore = create<EditorState>()(
 
             features: [],
             selectedFeatureId: null,
+            selectedFeatures: [],
+            selectedFeatureIds: [],
             searchResults: [],
 
             layers: [],
@@ -135,7 +142,66 @@ export const useEditorStore = create<EditorState>()(
             // ─── Tool / Class ────────────────────────────────────────
             setTool: (tool) => set({ currentTool: tool }),
             setFeatureClass: (fc) => set({ featureClass: fc }),
-            setSelectedFeature: (id) => set({ selectedFeatureId: id, isGeometryDirty: false }),
+            setSelectedFeature: (id) => set((state) => ({
+                selectedFeatureId: id,
+                selectedFeatures: id ? [state.features.find(f => f.id === id)!].filter(Boolean) : [],
+                selectedFeatureIds: id ? [id] : [],
+                isGeometryDirty: false,
+            })),
+            setPrimarySelectedFeature: (feature) => set((state) => {
+                if (!feature) {
+                    return {
+                        selectedFeatureId: null,
+                        isGeometryDirty: false,
+                    }
+                }
+
+                const featureKey = feature.backendId || feature.id
+                const existsInMulti = state.selectedFeatures.some((f) => (f.backendId || f.id) === featureKey)
+
+                if (!existsInMulti) {
+                    return {
+                        selectedFeatureId: feature.id,
+                        selectedFeatures: [feature],
+                        selectedFeatureIds: [feature.id],
+                        isGeometryDirty: false,
+                    }
+                }
+
+                return {
+                    selectedFeatureId: feature.id,
+                    isGeometryDirty: false,
+                }
+            }),
+            toggleSelectedFeature: (feature) => set((state) => {
+                const featureKey = feature.backendId || feature.id
+                const exists = state.selectedFeatures.some((f) => (f.backendId || f.id) === featureKey)
+
+                if (exists) {
+                    const nextSelectedFeatures = state.selectedFeatures.filter((f) => (f.backendId || f.id) !== featureKey)
+                    const nextPrimary = nextSelectedFeatures[nextSelectedFeatures.length - 1] || null
+                    return {
+                        selectedFeatures: nextSelectedFeatures,
+                        selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
+                        selectedFeatureId: nextPrimary?.id || null,
+                        isGeometryDirty: false,
+                    }
+                }
+
+                const nextSelectedFeatures = [...state.selectedFeatures, feature]
+                return {
+                    selectedFeatures: nextSelectedFeatures,
+                    selectedFeatureIds: nextSelectedFeatures.map((f) => f.id),
+                    selectedFeatureId: feature.id,
+                    isGeometryDirty: false,
+                }
+            }),
+            clearSelection: () => set({
+                selectedFeatureId: null,
+                selectedFeatures: [],
+                selectedFeatureIds: [],
+                isGeometryDirty: false,
+            }),
             
             setSelectedFeatureById: async (backendId: string) => {
                 set({ isLoading: true, selectedFeatureId: backendId, isGeometryDirty: false })

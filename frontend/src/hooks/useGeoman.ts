@@ -483,12 +483,12 @@ export function useGeoman() {
                 featureIdToLayer.current.set(f.id, layer)
                 layer.on('click', (e: L.LeafletMouseEvent) => {
                     L.DomEvent.stopPropagation(e)
-                    
+
                     // Contextual pick: restrict selection to the active type if in edit/history mode
                     const state = useEditorStore.getState()
                     const activeTool = state.currentTool
                     const activeType = state.featureClass
-                    
+
                     if (activeTool === 'edit' || activeTool === 'history') {
                         if (activeType !== 'custom' && activeType !== 'other' && f.featureClass !== activeType) {
                             console.log('[useGeoman] Selection ignored: type mismatch', f.featureClass, 'vs active:', activeType)
@@ -496,7 +496,12 @@ export function useGeoman() {
                         }
                     }
 
-                    setSelectedFeature(f.id)
+                    const isShiftSelect = !!(e.originalEvent as MouseEvent | undefined)?.shiftKey || isShiftHeld.current
+                    if (isShiftSelect && (activeTool === 'select' || activeTool === 'edit' || activeTool === 'history')) {
+                        state.toggleSelectedFeature(f)
+                    } else {
+                        setSelectedFeature(f.id)
+                    }
                 })
                 
                 // CRITICAL: Attach edit listeners to the specific layer
