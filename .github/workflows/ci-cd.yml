@@ -72,7 +72,7 @@ jobs:
         run: |
           PAYLOAD='{"ref":"main"}'
           SIG="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "${{ secrets.WEBHOOK_SECRET }}" | awk '{print $2}')"
-          curl -fsSL \
+          curl -fsS \
             -X POST \
             -H "Content-Type: application/json" \
             -H "X-Deploy-Signature: $SIG" \
