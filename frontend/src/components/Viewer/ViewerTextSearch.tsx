@@ -14,10 +14,10 @@ const SEARCH_TYPES: { value: string; label: string }[] = [
     { value: 'river', label: 'Реки' },
     { value: 'forest', label: 'Леса' },
     { value: 'road', label: 'Дороги' },
-    { value: 'building', label: 'Здания' },
-    { value: 'city', label: 'Нас. пункты' },
     { value: 'other', label: 'Другое' },
 ]
+
+const DISABLED_TYPES = new Set(['building', 'city'])
 
 export default function ViewerTextSearch() {
     const map = useMap()
@@ -53,14 +53,17 @@ export default function ViewerTextSearch() {
         setIsSearching(true)
         try {
             const res = await apiService.getGeoObjects(type || undefined, undefined, text)
-            const items = res.objects.slice(0, 20).map(obj => ({
+            const items = res.objects
+                .filter((obj) => !DISABLED_TYPES.has(obj.type))
+                .slice(0, 20)
+                .map(obj => ({
                 id: obj.id as string,
                 name: obj.name,
                 type: obj.type,
                 description: obj.description || '',
                 geometry: obj.geometry as GeoJSON.Geometry,
                 metadata: obj.metadata
-            }))
+                }))
             setLocalResults(items)
             setSearchResults(items)
         } catch (err) {

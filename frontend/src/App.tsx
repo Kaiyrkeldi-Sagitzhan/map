@@ -1,12 +1,18 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
-import MapEditor from './components/Editor/MapEditor'
 import Layout from './components/Layout/Layout'
-import Landing from './components/Landing/Landing'
-import OAuthCallback from './components/Landing/OAuthCallback'
-import MapViewer from './components/Viewer/MapViewer'
-import SettingsPage from './components/Settings/SettingsPage'
-import AdminLayout from './components/Admin/AdminLayout'
+
+const MapEditor = lazy(() => import('./components/Editor/MapEditor'))
+const Landing = lazy(() => import('./components/Landing/Landing'))
+const OAuthCallback = lazy(() => import('./components/Landing/OAuthCallback'))
+const MapViewer = lazy(() => import('./components/Viewer/MapViewer'))
+const SettingsPage = lazy(() => import('./components/Settings/SettingsPage'))
+const AdminLayout = lazy(() => import('./components/Admin/AdminLayout'))
+
+const RouteLoader = () => (
+  <div className="h-full w-full flex items-center justify-center bg-[#010814] text-slate-300 text-sm">Загрузка...</div>
+)
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, canEdit } = useAuth()
@@ -33,8 +39,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const location = useLocation()
+
   return (
-    <Routes>
+    <Suspense fallback={<RouteLoader />}>
+    <Routes location={location} key={location.pathname}>
       <Route path="/" element={<Landing />} />
       <Route path="/auth/google/callback" element={<OAuthCallback />} />
 
@@ -87,6 +96,7 @@ function App() {
         }
       />
     </Routes>
+    </Suspense>
   )
 }
 

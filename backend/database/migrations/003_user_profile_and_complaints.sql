@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_user ON complaints(user_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_object ON complaints(object_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
 
+DROP TRIGGER IF EXISTS update_complaints_updated_at ON complaints;
 CREATE TRIGGER update_complaints_updated_at
     BEFORE UPDATE ON complaints
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
