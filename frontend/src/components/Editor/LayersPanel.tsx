@@ -18,7 +18,7 @@ import {
     XCircle,
 } from 'lucide-react'
 
-const DISABLED_TYPES = new Set(['building', 'city'])
+const DISABLED_TYPES = new Set(['building', 'city', 'custom', 'other'])
 
 export default function LayersPanel() {
     const {
@@ -61,7 +61,7 @@ export default function LayersPanel() {
 
     return (
         <>
-            <div className={`fixed top-28 left-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'w-[300px] h-[40vh] rounded-[24px]'}`}>
+            <div className={`fixed top-28 left-6 z-[500] bg-[#020C1B] border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'w-[300px] h-[40vh] rounded-[24px]'}`}>
                 <div className={`${isCollapsed ? 'p-0 h-full' : 'p-3 border-b border-white/5 bg-white/[0.02]'} flex items-center justify-between`}>
                     <button
                         onClick={() => setIsCollapsed((v) => !v)}

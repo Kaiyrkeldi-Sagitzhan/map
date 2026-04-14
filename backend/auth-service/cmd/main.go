@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	_ "time/tzdata"
 
 	"auth-service/internal/config"
 	"auth-service/internal/handler"

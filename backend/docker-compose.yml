@@ -117,6 +117,7 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      network: host
     container_name: kzmap-frontend
     environment:
       VITE_API_URL: http://localhost:8080
