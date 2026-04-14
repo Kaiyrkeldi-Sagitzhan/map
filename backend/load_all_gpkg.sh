@@ -130,21 +130,22 @@ load_layer_pro() {
         'OSM ' || fclass || ' (Full metadata)',
         to_jsonb($tmp_table.*) - 'geom' - 'fid',
         geom
-      FROM $tmp_table;
+      FROM $tmp_table
+      WHERE '$internal_type' != 'forest'
+         OR fclass IN ('forest', 'wood', 'park', 'nature_reserve', 'grass', 'meadow', 'scrub', 'heath');
     "
 
     run_psql "DROP TABLE IF EXISTS $tmp_table CASCADE;"
 }
 
-# Load every single layer from the archive with full metadata
+# Озёра
 load_layer_pro "gis_osm_water_a_free" "lake"
+# Реки
 load_layer_pro "gis_osm_waterways_free" "river"
+# Дороги
 load_layer_pro "gis_osm_roads_free" "road"
-load_layer_pro "gis_osm_railways_free" "road"
+# Леса (только полигоны landuse типа forest/wood/park)
 load_layer_pro "gis_osm_landuse_a_free" "forest"
-load_layer_pro "gis_osm_natural_a_free" "forest"
-load_layer_pro "gis_osm_natural_free" "forest"
-load_layer_pro "gis_osm_transport_a_free" "road"
 
 echo "-------------------------------------------------"
 echo "Finalizing Pro Import..."
