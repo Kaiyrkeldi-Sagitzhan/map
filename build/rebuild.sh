@@ -43,8 +43,8 @@ header()  { echo -e "\n${BOLD}${CYAN}══════════════�
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 
-COMPOSE_BACKEND="-f $ROOT_DIR/docker-compose.backend.yml"
-COMPOSE_FRONTEND="-f $ROOT_DIR/docker-compose.frontend.yml"
+COMPOSE_BACKEND="--env-file $ROOT_DIR/backend/.env -f $ROOT_DIR/docker-compose.backend.yml"
+COMPOSE_FRONTEND="--env-file $ROOT_DIR/backend/.env -f $ROOT_DIR/docker-compose.frontend.yml"
 COMPOSE_ALL="$COMPOSE_BACKEND $COMPOSE_FRONTEND"
 
 # ── Defaults ──────────────────────────────────────────────────

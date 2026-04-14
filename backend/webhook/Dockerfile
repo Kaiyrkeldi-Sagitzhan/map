@@ -1,7 +1,8 @@
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
+COPY go.mod .
 COPY main.go .
-RUN go mod init webhook && go build -o webhook .
+RUN go build -o webhook .
 
 FROM alpine:3.19
 RUN apk add --no-cache bash git docker-cli
