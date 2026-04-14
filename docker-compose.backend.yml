@@ -163,6 +163,24 @@ services:
       fi;
       "
 
+  # Deploy webhook
+  webhook:
+    build:
+      context: ./backend/webhook
+      dockerfile: Dockerfile
+    container_name: kzmap-webhook
+    environment:
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      DEPLOY_PATH: ${DEPLOY_PATH:-/home/ask/map}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DEPLOY_PATH:-/home/ask/map}:${DEPLOY_PATH:-/home/ask/map}
+    ports:
+      - "9000:9000"
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
   # Swagger UI — API documentation
   swagger-ui:
     image: swaggerapi/swagger-ui
