@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
 
 networks:
-  # Must be created by docker-compose.backend.yml first
+  # Created by docker-compose.backend.yml (map_ prefix from project name)
   kzmap-network:
     external: true
+    name: map_kzmap-network

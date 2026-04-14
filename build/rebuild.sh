@@ -180,11 +180,11 @@ header "Starting"
 # Backend must start first so the external network exists for frontend
 if ! $OPT_FRONTEND_ONLY; then
   # shellcheck disable=SC2086
-  docker compose $COMPOSE_BACKEND up -d --force-recreate --remove-orphans
+  docker compose $COMPOSE_BACKEND up -d --force-recreate
 fi
 if ! $OPT_BACKEND_ONLY; then
   # shellcheck disable=SC2086
-  docker compose $COMPOSE_FRONTEND up -d --force-recreate --remove-orphans
+  docker compose $COMPOSE_FRONTEND up -d --force-recreate
 fi
 success "Containers started"
 
