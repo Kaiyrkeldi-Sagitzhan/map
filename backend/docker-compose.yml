@@ -60,7 +60,7 @@ services:
       # Google OAuth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-802334362365-0nuf4kqu0l3lc78kldnalqell9ddop88.apps.googleusercontent.com}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
-      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-http://localhost:3000/auth/google/callback}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-https://map.aetherion.work/auth/google/callback}
       # SMTP (for email verification)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -119,9 +119,9 @@ services:
       dockerfile: Dockerfile
     container_name: kzmap-frontend
     environment:
-      VITE_API_URL: http://localhost:8080
-      VITE_AUTH_SERVICE_URL: http://api-gateway
-      VITE_MAP_SERVICE_URL: http://api-gateway
+      VITE_API_URL: https://map.aetherion.work
+      VITE_AUTH_SERVICE_URL: ''
+      VITE_MAP_SERVICE_URL: ''
     ports:
       - "3000:3000"
     depends_on:
