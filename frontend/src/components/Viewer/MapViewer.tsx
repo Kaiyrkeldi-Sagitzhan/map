@@ -4,7 +4,7 @@
  * Search area uses Geoman (same as editor) for reliable polygon/rectangle drawing.
  */
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { MapContainer, TileLayer, ScaleControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
@@ -21,8 +21,8 @@ import ViewerTextSearch from './ViewerTextSearch'
 import ViewerToolbar from './ViewerToolbar'
 import ComplaintModal from './ComplaintModal'
 import VectorTileLayer from '../Map/VectorTileLayer'
-import ZoomPicker from '../Editor/ZoomPicker'
 import ViewerSearchResults from './ViewerSearchResults'
+import DistanceMeasureTool from '../Map/DistanceMeasureTool'
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -491,6 +491,7 @@ const SearchResultsOverlay = () => {
 const MapViewer = () => {
     const showMap = useViewerStore((s) => s.showMap)
     const mapOpacity = useViewerStore((s) => s.mapOpacity)
+    const activeTool = useViewerStore((s) => s.activeTool)
     const [complaintTarget, setComplaintTarget] = useState<any>(null)
 
     return (
@@ -519,13 +520,12 @@ const MapViewer = () => {
                     <VectorTileLayer />
                     <HighlightOverlay />
                     <SearchResultsOverlay />
+                    <DistanceMeasureTool active={activeTool === 'measure'} accentColor="#f59e0b" />
                     <ViewerTextSearch />
-                    <ScaleControl position="bottomleft" />
-                    <ZoomPicker />
+                    <ViewerCoordinateDisplay />
                 </MapContainer>
 
                 <ViewerToolbar />
-                <ViewerCoordinateDisplay />
                 <ViewerSearchResults />
             </main>
 

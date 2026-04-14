@@ -8,6 +8,7 @@ import type { DrawTool, FeatureClass } from '../../types/editor'
 import { CLASS_LABELS, CLASS_STYLES } from '../../types/editor'
 import { 
     MousePointer2, 
+    Ruler,
     Hexagon, 
     Square, 
     Circle, 
@@ -35,6 +36,11 @@ const tools: ToolDef[] = [
         id: 'select',
         label: 'Выделение (V)',
         icon: <MousePointer2 size={18} />,
+    },
+    {
+        id: 'measure',
+        label: 'Линейка (D)',
+        icon: <Ruler size={18} />,
     },
     {
         id: 'drawPolygon',
@@ -83,7 +89,7 @@ const tools: ToolDef[] = [
     },
 ]
 
-const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'building', 'city', 'other', 'custom']
+const featureClasses: FeatureClass[] = ['lake', 'river', 'forest', 'road']
 
 export default function Toolbar() {
     const { currentTool, setTool, featureClass, setFeatureClass, showMap, setShowMap } = useEditorStore()
@@ -119,6 +125,7 @@ export default function Toolbar() {
 
             switch (e.key.toLowerCase()) {
                 case 'v': setTool('select'); break
+                case 'd': setTool('measure'); break
                 case 'p': setTool('drawPolygon'); break
                 case 'r': setTool('drawRectangle'); break
                 case 'o': setTool('drawCircle'); break
@@ -135,7 +142,7 @@ export default function Toolbar() {
     return (
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2">
             {/* Main toolbar pill */}
-            <div className="flex items-center gap-0.5 bg-[#020C1B]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
+            <div className="flex items-center gap-0.5 bg-[#020C1B] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
                 {tools.map((tool) => (
                     <button
                         key={tool.id}
@@ -205,7 +212,7 @@ export default function Toolbar() {
 
                     {/* Dropdown menu */}
                     {showClassMenu && (
-                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#020C1B]/95 backdrop-blur-3xl rounded-2xl shadow-2xl border border-white/10 py-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-[#020C1B] rounded-2xl shadow-2xl border border-white/10 py-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
                             <div className="px-4 py-2 mb-1 border-b border-white/5">
                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Тип объекта</span>
                             </div>

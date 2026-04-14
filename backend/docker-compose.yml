@@ -117,6 +117,7 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      network: host
     container_name: kzmap-frontend
     environment:
       VITE_API_URL: http://localhost:8080
@@ -168,18 +169,25 @@ services:
       - kzmap-network
     entrypoint: >
       sh -c "
-      echo 'Checking database state...'
-      count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM information_schema.tables WHERE table_name = 'geo_objects';\")
-      if [ $$count -eq 0 ]; then
-        echo 'Database empty. Running migrations and import...'
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql
-        psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql
-        ./load_all_gpkg.sh
+      echo 'Running all migrations (idempotent)...';
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql;
+      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/005_area_metadata.sql;
+      echo 'Migrations done.';
+      echo 'Loading geodata if gpkg exists...';
+      if [ -f gpkg_data/kazakhstan.gpkg ]; then
+        count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM geo_objects;\");
+        if [ $$count -lt 500000 ]; then
+          echo 'Less than 500k objects, running full import...';
+          DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
+        else
+          echo \"Already have $$count objects, skipping import.\";
+        fi;
       else
-        echo 'Database already initialized.'
-      fi
+        echo 'No gpkg file found. Download it first (see README).';
+      fi;
       "
 
 volumes:

@@ -4,7 +4,7 @@
  * Bottom: floating toolbar pill + coordinate display.
  */
 import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, ScaleControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -17,8 +17,8 @@ import CoordinateDisplay from './CoordinateDisplay'
 import GeomanController from './GeomanController'
 import SearchResults from './SearchResults'
 import TextSearch from './TextSearch'
-import ZoomPicker from './ZoomPicker'
 import VectorTileLayer from '../Map/VectorTileLayer'
+import DistanceMeasureTool from '../Map/DistanceMeasureTool'
 
 // Fix for default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -117,6 +117,7 @@ const MapStateTracker = () => {
 const MapEditor = () => {
     const showMap = useEditorStore((s) => s.showMap)
     const mapOpacity = useEditorStore((s) => s.mapOpacity)
+    const currentTool = useEditorStore((s) => s.currentTool)
 
     return (
         <div className="flex h-full w-full overflow-hidden bg-[#010814] text-white font-sans selection:bg-[#10B981]/30">
@@ -144,16 +145,14 @@ const MapEditor = () => {
 
                     <VectorTileLayer />
                     <GeomanController />
+                    <DistanceMeasureTool active={currentTool === 'measure'} />
                     <TextSearch />
 
-                    {/* Visual enhancements */}
-                    <ScaleControl position="bottomleft" />
-                    <ZoomPicker />
+                    <CoordinateDisplay />
                 </MapContainer>
 
                 {/* Overlays (Zustand based) */}
                 <Toolbar />
-                <CoordinateDisplay />
                 <SearchResults />
             </main>
 

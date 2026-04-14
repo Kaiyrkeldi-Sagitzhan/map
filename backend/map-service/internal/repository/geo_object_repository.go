@@ -19,6 +19,17 @@ var (
 	ErrObjectNotFound = errors.New("object not found")
 )
 
+// GeoObjectRepositoryInterface defines the interface for geo object repository operations
+type GeoObjectRepositoryInterface interface {
+	Create(ctx context.Context, obj *model.GeoObject) error
+	GetByID(ctx context.Context, id uuid.UUID) (*model.GeoObjectWithGeometry, error)
+	GetAll(ctx context.Context, search string) ([]model.GeoObject, error)
+	Update(ctx context.Context, id uuid.UUID, obj *model.GeoObject) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByBBox(ctx context.Context, minLat, minLng, maxLat, maxLng float64, objType string) ([]model.GeoObject, error)
+	GetByType(ctx context.Context, objType string) ([]model.GeoObject, error)
+}
+
 // GeoObjectRepository handles geo object database operations
 type GeoObjectRepository struct {
 	db *sqlx.DB
@@ -32,8 +43,30 @@ func NewGeoObjectRepository(db *sqlx.DB) *GeoObjectRepository {
 // Create creates a new geo object in the database
 func (r *GeoObjectRepository) Create(ctx context.Context, obj *model.GeoObject) error {
 	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($8), 4326) AS g
+		)
 		INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, ST_GeomFromGeoJSON($8), $9, $10)
+		SELECT
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			CASE
+				WHEN GeometryType(geom.g) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($7::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(geom.g::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(geom.g::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($7::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geom.g,
+			$9,
+			$10
+		FROM geom
 	`
 
 	// Extract geometry from Feature if needed (Leaflet Draw produces Feature objects)
@@ -56,7 +89,7 @@ func (r *GeoObjectRepository) Create(ctx context.Context, obj *model.GeoObject) 
 		metadata = json.RawMessage("{}")
 	}
 
-	log.Printf("[DEBUG] Creating geo object: id=%s, type=%s, name=%s, geometry=%s", 
+	log.Printf("[DEBUG] Creating geo object: id=%s, type=%s, name=%s, geometry=%s",
 		obj.ID, obj.Type, obj.Name, string(geometryJSON))
 
 	_, err = r.db.ExecContext(ctx, query,
@@ -245,7 +278,9 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 		if allowed != nil {
 			typesSQL := "type IN ("
 			for i, t := range allowed {
-				if i > 0 { typesSQL += "," }
+				if i > 0 {
+					typesSQL += ","
+				}
 				typesSQL += fmt.Sprintf("'%s'", t)
 			}
 			typesSQL += ")"
@@ -281,8 +316,12 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 		if err != nil {
 			return nil, err
 		}
-		if description.Valid { obj.Description = description.String }
-		if !geometryDB.Valid || geometryDB.String == "" || geometryDB.String == "null" { continue }
+		if description.Valid {
+			obj.Description = description.String
+		}
+		if !geometryDB.Valid || geometryDB.String == "" || geometryDB.String == "null" {
+			continue
+		}
 		obj.Geometry = json.RawMessage(geometryDB.String)
 		objects = append(objects, obj)
 	}
@@ -293,14 +332,18 @@ func (r *GeoObjectRepository) GetByBBox(ctx context.Context, userID uuid.UUID, i
 func (r *GeoObjectRepository) GetByType(ctx context.Context, objType string) ([]model.GeoObjectWithGeometry, error) {
 	query := `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE type = $1 ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, query, objType)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var objects []model.GeoObjectWithGeometry
 	for rows.Next() {
 		var obj model.GeoObjectWithGeometry
 		var geometryDB []byte
 		err := rows.Scan(&obj.ID, &obj.OwnerID, &obj.Scope, &obj.Type, &obj.Name, &obj.Description, &obj.Metadata, &geometryDB, &obj.CreatedAt, &obj.UpdatedAt)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		obj.Geometry = json.RawMessage(geometryDB)
 		objects = append(objects, obj)
 	}
@@ -309,15 +352,43 @@ func (r *GeoObjectRepository) GetByType(ctx context.Context, objType string) ([]
 
 // Update updates a geo object in the database
 func (r *GeoObjectRepository) Update(ctx context.Context, obj *model.GeoObject) error {
-	query := `UPDATE geo_objects SET scope = $2, type = $3, name = $4, description = $5, metadata = $6, geometry = ST_GeomFromGeoJSON($7), updated_at = $8 WHERE id = $1`
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($7), 4326) AS g
+		)
+		UPDATE geo_objects
+		SET
+			scope = $2,
+			type = $3,
+			name = $4,
+			description = $5,
+			metadata = CASE
+				WHEN GeometryType((SELECT g FROM geom)) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($6::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(((SELECT g FROM geom))::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(((SELECT g FROM geom))::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($6::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geometry = (SELECT g FROM geom),
+			updated_at = $8
+		WHERE id = $1
+	`
 	geometryBytes, _ := json.Marshal(obj.Geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	metadata := obj.Metadata
-	if len(metadata) == 0 { metadata = json.RawMessage("{}") }
+	if len(metadata) == 0 {
+		metadata = json.RawMessage("{}")
+	}
 	result, err := r.db.ExecContext(ctx, query, obj.ID, obj.Scope, obj.Type, obj.Name, obj.Description, metadata, string(geometryJSON), obj.UpdatedAt)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	rows, _ := result.RowsAffected()
-	if rows == 0 { return ErrObjectNotFound }
+	if rows == 0 {
+		return ErrObjectNotFound
+	}
 	return nil
 }
 
@@ -325,9 +396,13 @@ func (r *GeoObjectRepository) Update(ctx context.Context, obj *model.GeoObject) 
 func (r *GeoObjectRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM geo_objects WHERE id = $1`
 	result, err := r.db.ExecContext(ctx, query, id)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	rows, _ := result.RowsAffected()
-	if rows == 0 { return ErrObjectNotFound }
+	if rows == 0 {
+		return ErrObjectNotFound
+	}
 	return nil
 }
 
@@ -335,14 +410,18 @@ func (r *GeoObjectRepository) Delete(ctx context.Context, id uuid.UUID) error {
 func (r *GeoObjectRepository) GetByOwner(ctx context.Context, ownerID uuid.UUID) ([]model.GeoObjectWithGeometry, error) {
 	query := `SELECT id, owner_id, scope, type, name, COALESCE(description, '') as description, metadata, ST_AsGeoJSON(geometry) as geometry, created_at, updated_at FROM geo_objects WHERE owner_id = $1 ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, query, ownerID)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	var objects []model.GeoObjectWithGeometry
 	for rows.Next() {
 		var obj model.GeoObjectWithGeometry
 		var geometryDB []byte
 		err := rows.Scan(&obj.ID, &obj.OwnerID, &obj.Scope, &obj.Type, &obj.Name, &obj.Description, &obj.Metadata, &geometryDB, &obj.CreatedAt, &obj.UpdatedAt)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		obj.Geometry = json.RawMessage(geometryDB)
 		objects = append(objects, obj)
 	}
@@ -422,8 +501,32 @@ func (r *GeoObjectRepository) UpdateFromSnapshot(ctx context.Context, id uuid.UU
 		metadata = json.RawMessage(mBytes)
 	}
 	var geometry interface{}
-	if g, ok := data["geometry"]; ok { geometry = g }
-	query := `UPDATE geo_objects SET scope = $2, type = $3, name = $4, description = $5, metadata = $6, geometry = ST_GeomFromGeoJSON($7), updated_at = NOW() WHERE id = $1`
+	if g, ok := data["geometry"]; ok {
+		geometry = g
+	}
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($7), 4326) AS g
+		)
+		UPDATE geo_objects
+		SET
+			scope = $2,
+			type = $3,
+			name = $4,
+			description = $5,
+			metadata = CASE
+				WHEN GeometryType((SELECT g FROM geom)) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($6::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(((SELECT g FROM geom))::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(((SELECT g FROM geom))::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($6::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geometry = (SELECT g FROM geom),
+			updated_at = NOW()
+		WHERE id = $1
+	`
 	geometryBytes, _ := json.Marshal(geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	_, err := r.db.ExecContext(ctx, query, id, scope, objType, name, description, metadata, string(geometryJSON))
@@ -445,12 +548,41 @@ func (r *GeoObjectRepository) RestoreFromSnapshot(ctx context.Context, id uuid.U
 		metadata = json.RawMessage(mBytes)
 	}
 	var geometry interface{}
-	if g, ok := data["geometry"]; ok { geometry = g }
+	if g, ok := data["geometry"]; ok {
+		geometry = g
+	}
 	var ownerID *uuid.UUID
 	if s, ok := ownerIDVal.(string); ok && s != "" {
-		if u, err := uuid.Parse(s); err == nil { ownerID = &u }
+		if u, err := uuid.Parse(s); err == nil {
+			ownerID = &u
+		}
 	}
-	query := `INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, ST_GeomFromGeoJSON($8), NOW(), NOW())`
+	query := `
+		WITH geom AS (
+			SELECT ST_SetSRID(ST_GeomFromGeoJSON($8), 4326) AS g
+		)
+		INSERT INTO geo_objects (id, owner_id, scope, type, name, description, metadata, geometry, created_at, updated_at)
+		SELECT
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			CASE
+				WHEN GeometryType(geom.g) IN ('POLYGON', 'MULTIPOLYGON') THEN
+					COALESCE($7::jsonb, '{}'::jsonb) || jsonb_build_object(
+						'area_m2', ROUND(ST_Area(geom.g::geography)::numeric, 2),
+						'area_km2', ROUND((ST_Area(geom.g::geography) / 1000000.0)::numeric, 6)
+					)
+				ELSE
+					COALESCE($7::jsonb, '{}'::jsonb) - 'area_m2' - 'area_km2'
+			END,
+			geom.g,
+			NOW(),
+			NOW()
+		FROM geom
+	`
 	geometryBytes, _ := json.Marshal(geometry)
 	geometryJSON, _ := extractGeometryJSON(geometryBytes)
 	_, err := r.db.ExecContext(ctx, query, id, ownerID, scope, objType, name, description, metadata, string(geometryJSON))

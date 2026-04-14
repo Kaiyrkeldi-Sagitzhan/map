@@ -5,6 +5,7 @@
 // ─── Draw Tools ────────────────────────────────────────────
 export type DrawTool =
     | 'select'
+    | 'measure'
     | 'drawPolygon'
     | 'drawRectangle'
     | 'drawCircle'
