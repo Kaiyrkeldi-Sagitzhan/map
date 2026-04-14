@@ -68,18 +68,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-          script: |
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<'EOF'
+          Host ssh.map.aetherion.work
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            IdentityFile ~/.ssh/deploy_key
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy via Cloudflare Tunnel
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          ssh ${{ secrets.SSH_USER }}@ssh.map.aetherion.work "
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
-            echo "==> Pulling latest code..."
+            echo '==> Pulling latest code...'
             git pull origin main
-            echo "==> Rebuilding all services..."
+            echo '==> Rebuilding all services...'
             bash build/rebuild.sh 1
-            echo "==> Deploy complete!"
+            echo '==> Deploy complete!'
+          "
