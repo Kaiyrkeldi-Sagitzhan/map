@@ -1,0 +1,98 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  # ─── Build & Test ────────────────────────────────────────────────────────────
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: |
+            backend/auth-service/go.sum
+            backend/map-service/go.sum
+
+      # ── auth-service ──
+      - name: Build auth-service
+        working-directory: backend/auth-service
+        run: go build ./...
+
+      - name: Vet auth-service
+        working-directory: backend/auth-service
+        run: go vet ./...
+
+      - name: Test auth-service
+        working-directory: backend/auth-service
+        run: go test ./...
+
+      # ── map-service ──
+      - name: Build map-service
+        working-directory: backend/map-service
+        run: go build ./...
+
+      - name: Vet map-service
+        working-directory: backend/map-service
+        run: go vet ./...
+
+      - name: Test map-service
+        working-directory: backend/map-service
+        run: go test ./...
+
+      # ── Docker builds ──
+      - name: Build auth-service Docker image
+        run: docker build -t kzmap-auth-service ./backend/auth-service
+
+      - name: Build map-service Docker image
+        run: docker build -t kzmap-map-service ./backend/map-service
+
+      - name: Build frontend Docker image
+        run: docker build -t kzmap-frontend ./frontend
+
+  # ─── Deploy (only on push to main) ──────────────────────────────────────────
+  deploy:
+    name: Deploy to Server
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Setup SSH key and config
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<EOF
+          Host ssh.map.aetherion.work
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            IdentityFile ~/.ssh/deploy_key
+          EOF
+
+      - name: Deploy via SSH tunnel
+        run: |
+          ssh ${{ secrets.SSH_USER }}@ssh.map.aetherion.work "
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            echo '==> Pulling latest code...'
+            git pull origin main
+            echo '==> Rebuilding all services...'
+            bash build/rebuild.sh 1
+            echo '==> Deploy complete!'
+          "

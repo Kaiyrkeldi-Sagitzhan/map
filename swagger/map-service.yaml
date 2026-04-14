@@ -1,0 +1,858 @@
+openapi: 3.0.3
+info:
+  title: KZ Map — Map Service
+  description: |
+    Geospatial object API for the Kazakhstan Interactive Map Platform.
+
+    **Authentication:** All endpoints require a Bearer JWT token.
+
+    **Scopes:**
+    - `global` — visible to all authenticated users
+    - `private` — visible only to the owner (and admins/experts)
+
+    **Geo object types** (examples): `city`, `river`, `lake`, `mountain`, `road`, `border`, `region`, `forest`, `district`, `railway`, `airport`, `landmark`
+
+    **Geometry:** GeoJSON geometry object (`Point`, `LineString`, `Polygon`, `MultiPolygon`, etc.)
+  version: 1.0.0
+  contact:
+    name: KZMap Team
+
+servers:
+  - url: https://map.aetherion.work/api/map
+    description: Production (via API Gateway)
+  - url: http://localhost:8080/api/map
+    description: Local (via API Gateway)
+  - url: http://localhost:8082/api/map
+    description: Local (direct)
+
+tags:
+  - name: Geo Objects
+    description: CRUD for geographic objects
+  - name: Tiles
+    description: Vector tile (MVT/PBF) serving
+  - name: History
+    description: Change history and rollback
+  - name: Complaints
+    description: User complaints about map objects
+  - name: Stats
+    description: Statistics
+
+paths:
+  # ─── Geo Objects ─────────────────────────────────────────────────────────────
+
+  /objects:
+    post:
+      tags: [Geo Objects]
+      summary: Create a geo object
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGeoObjectRequest'
+            example:
+              scope: global
+              type: city
+              name: Almaty
+              description: Largest city in Kazakhstan
+              geometry:
+                type: Point
+                coordinates: [76.889709, 43.238949]
+              metadata:
+                population: 2000000
+                founded: 1854
+      responses:
+        '201':
+          description: Object created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoObjectResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied (only experts/admins can create global objects)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [Geo Objects]
+      summary: List geo objects
+      description: |
+        Returns all objects accessible to the current user. Supports spatial bounding box
+        filtering, text search, type filter, and custom metadata filters.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          description: Filter by object type (e.g. `city`, `river`)
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Full-text search by name
+          schema:
+            type: string
+        - name: minLat
+          in: query
+          description: Bounding box — minimum latitude
+          schema:
+            type: number
+            format: double
+        - name: minLng
+          in: query
+          description: Bounding box — minimum longitude
+          schema:
+            type: number
+            format: double
+        - name: maxLat
+          in: query
+          description: Bounding box — maximum latitude
+          schema:
+            type: number
+            format: double
+        - name: maxLng
+          in: query
+          description: Bounding box — maximum longitude
+          schema:
+            type: number
+            format: double
+        - name: zoom
+          in: query
+          description: Current map zoom level (used for zoom-based filtering, default 10)
+          schema:
+            type: integer
+            default: 10
+        - name: clip
+          in: query
+          description: Clip geometries to bbox (default false)
+          schema:
+            type: boolean
+            default: false
+        - name: filterByZoom
+          in: query
+          description: Enable zoom-level-based filtering (default true)
+          schema:
+            type: boolean
+            default: true
+        - name: meta_*
+          in: query
+          description: |
+            Filter by metadata field. Prefix any field name with `meta_`.
+            E.g. `meta_population=2000000` filters objects where `metadata.population = "2000000"`.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of geo objects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoObjectListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /objects/{id}:
+    get:
+      tags: [Geo Objects]
+      summary: Get geo object by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectID'
+      responses:
+        '200':
+          description: Geo object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoObjectResponse'
+        '400':
+          description: Invalid UUID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied (private object of another user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Object not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Geo Objects]
+      summary: Update geo object
+      description: Partial update — only provided fields are changed.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGeoObjectRequest'
+            example:
+              name: Almaty (updated)
+              description: Largest city, financial center
+              metadata:
+                population: 2100000
+      responses:
+        '200':
+          description: Updated geo object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoObjectResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Object not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Geo Objects]
+      summary: Delete geo object
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectID'
+      responses:
+        '200':
+          description: Object deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example: { message: "Object deleted successfully" }
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Object not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Vector Tiles ─────────────────────────────────────────────────────────────
+
+  /tiles/{z}/{x}/{y}.pbf:
+    get:
+      tags: [Tiles]
+      summary: Get vector map tile (MVT/PBF)
+      description: |
+        Returns a Mapbox Vector Tile (protobuf) for the given tile coordinates.
+        Used by Leaflet with vector-tile plugins.
+        Returns `204 No Content` if the tile is empty.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: z
+          in: path
+          required: true
+          description: Zoom level (0–22)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 22
+            example: 10
+        - name: x
+          in: path
+          required: true
+          description: Tile X coordinate
+          schema:
+            type: integer
+            example: 614
+        - name: y
+          in: path
+          required: true
+          description: Tile Y coordinate
+          schema:
+            type: integer
+            example: 372
+      responses:
+        '200':
+          description: Vector tile (protobuf)
+          content:
+            application/x-protobuf:
+              schema:
+                type: string
+                format: binary
+        '204':
+          description: Tile is empty (no objects in this tile)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: Tile generation error
+
+  # ─── History ──────────────────────────────────────────────────────────────────
+
+  /objects/{id}/history:
+    get:
+      tags: [History]
+      summary: Get change history of a geo object
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectID'
+      responses:
+        '200':
+          description: List of history entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeoObjectHistoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /history/{historyId}/rollback:
+    post:
+      tags: [History]
+      summary: Rollback object to a previous state
+      description: Restores the geo object to the state captured in the given history entry.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: historyId
+          in: path
+          required: true
+          description: History entry UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rollback successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RollbackResponse'
+              example: { success: true, message: "Rollback successful" }
+        '400':
+          description: Invalid history ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Stats ────────────────────────────────────────────────────────────────────
+
+  /stats:
+    get:
+      tags: [Stats]
+      summary: Get object type statistics
+      description: Returns count of objects per type and the total count.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Complaints ───────────────────────────────────────────────────────────────
+
+  /complaints:
+    post:
+      tags: [Complaints]
+      summary: Submit a complaint about a map object
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateComplaintRequest'
+            example:
+              object_id: 550e8400-e29b-41d4-a716-446655440000
+              object_type: city
+              description: Incorrect coordinates for this city
+      responses:
+        '201':
+          description: Complaint submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplaintResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [Complaints]
+      summary: List complaints (admin/expert)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated complaint list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplaintListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /complaints/{id}:
+    get:
+      tags: [Complaints]
+      summary: Get complaint by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintID'
+      responses:
+        '200':
+          description: Complaint detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplaintResponse'
+        '404':
+          description: Complaint not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Complaints]
+      summary: Update complaint status (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ComplaintID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateComplaintRequest'
+            example:
+              status: resolved
+              admin_notes: Fixed the coordinates. Object updated.
+      responses:
+        '200':
+          description: Updated complaint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplaintResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Health ───────────────────────────────────────────────────────────────────
+
+  /../../health:
+    get:
+      tags: [Stats]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: map-service
+
+# ─── Components ────────────────────────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from auth-service /login
+
+  parameters:
+    ObjectID:
+      name: id
+      in: path
+      required: true
+      description: Geo object UUID
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    ComplaintID:
+      name: id
+      in: path
+      required: true
+      description: Complaint UUID
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: unauthorized
+            message: "Authorization header missing or invalid"
+
+  schemas:
+    # ── Requests ──
+
+    CreateGeoObjectRequest:
+      type: object
+      required: [scope, type, name, geometry]
+      properties:
+        scope:
+          type: string
+          enum: [global, private]
+          description: |
+            `global` — visible to all; only experts/admins can create.
+            `private` — visible only to owner.
+        type:
+          type: string
+          description: Object type (city, river, lake, mountain, road, etc.)
+          example: city
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Almaty
+        description:
+          type: string
+          example: Largest city in Kazakhstan
+        geometry:
+          $ref: '#/components/schemas/GeoJSONGeometry'
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Arbitrary JSON metadata
+          example:
+            population: 2000000
+            founded: 1854
+
+    UpdateGeoObjectRequest:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [global, private]
+        type:
+          type: string
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        geometry:
+          $ref: '#/components/schemas/GeoJSONGeometry'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CreateComplaintRequest:
+      type: object
+      required: [object_type, description]
+      properties:
+        object_id:
+          type: string
+          format: uuid
+          description: UUID of the map object (optional)
+        object_type:
+          type: string
+          example: city
+        description:
+          type: string
+          minLength: 1
+          example: Incorrect coordinates
+
+    UpdateComplaintRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, in_progress, resolved, rejected]
+          example: resolved
+        admin_notes:
+          type: string
+          example: Fixed the issue.
+
+    # ── Responses ──
+
+    GeoObjectResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+          nullable: true
+        scope:
+          type: string
+          enum: [global, private]
+        type:
+          type: string
+          example: city
+        name:
+          type: string
+          example: Almaty
+        description:
+          type: string
+        geometry:
+          $ref: '#/components/schemas/GeoJSONGeometry'
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GeoObjectListResponse:
+      type: object
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeoObjectResponse'
+        total:
+          type: integer
+          description: Total number of matching objects
+
+    GeoObjectHistoryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        objectId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum: [create, update, delete, rollback]
+          example: update
+        description:
+          type: string
+          example: "Updated name and geometry"
+        beforeSnapshot:
+          $ref: '#/components/schemas/GeoObjectResponse'
+        afterSnapshot:
+          $ref: '#/components/schemas/GeoObjectResponse'
+        createdAt:
+          type: string
+          format: date-time
+
+    RollbackResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    StatsResponse:
+      type: object
+      properties:
+        stats:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeStat'
+        total:
+          type: integer
+
+    TypeStat:
+      type: object
+      properties:
+        type:
+          type: string
+          example: city
+        count:
+          type: integer
+          example: 87
+        centroid:
+          type: array
+          items:
+            type: number
+          description: "[longitude, latitude] centroid of all objects of this type"
+          nullable: true
+
+    ComplaintResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        user_email:
+          type: string
+          format: email
+        object_id:
+          type: string
+          format: uuid
+          nullable: true
+        object_type:
+          type: string
+        object_name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, in_progress, resolved, rejected]
+        admin_notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ComplaintListResponse:
+      type: object
+      properties:
+        complaints:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplaintResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    # ── GeoJSON ──
+
+    GeoJSONGeometry:
+      type: object
+      description: GeoJSON geometry object (RFC 7946)
+      required: [type, coordinates]
+      properties:
+        type:
+          type: string
+          enum: [Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon]
+          example: Point
+        coordinates:
+          description: |
+            Coordinates depend on the geometry type:
+            - **Point**: `[longitude, latitude]`
+            - **LineString**: `[[lng, lat], [lng, lat], ...]`
+            - **Polygon**: `[[[lng, lat], ...]]` (array of rings)
+            - **Multi***: array of the corresponding single-type coordinates
+          example: [76.889709, 43.238949]
+      example:
+        type: Point
+        coordinates: [76.889709, 43.238949]
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          description: Optional payload
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: validation_error
+        message:
+          type: string
+          description: Human-readable description

@@ -1,0 +1,22 @@
+services:
+  # Frontend (React + Vite → Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      network: host
+    container_name: kzmap-frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-https://map.aetherion.work}
+      VITE_AUTH_SERVICE_URL: ''
+      VITE_MAP_SERVICE_URL: ''
+    ports:
+      - "3000:3000"
+    networks:
+      - kzmap-network
+    restart: unless-stopped
+
+networks:
+  # Must be created by docker-compose.backend.yml first
+  kzmap-network:
+    external: true
