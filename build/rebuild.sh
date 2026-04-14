@@ -1,17 +1,24 @@
 #!/bin/bash
-# rebuild.sh — Full stack rebuild automation for kzmap
+# rebuild.sh — Interactive rebuild for kzmap
 #
-# Usage:
-#   ./build/rebuild.sh [options]
+# Usage (interactive):
+#   ./build/rebuild.sh
 #
-# Options:
-#   --cache           Use Docker layer cache (default: no-cache)
-#   --frontend-only   Rebuild only the frontend image
-#   --backend-only    Rebuild only auth-service and map-service images
-#   --with-data       Re-import GPKG geodata into PostGIS after rebuild
-#   --bake            Warm up Redis tile cache after rebuild
-#   --down            docker compose down before rebuild (removes containers)
-#   --help            Show this help message
+# Usage (non-interactive):
+#   ./build/rebuild.sh <mode>
+#
+# Modes:
+#   1  full-fast       Full rebuild with cache
+#   2  full-slow       Full rebuild no-cache (clean)
+#   3  backend-fast    Backend only with cache
+#   4  backend-slow    Backend only no-cache
+#   5  frontend-fast   Frontend only with cache
+#   6  frontend-slow   Frontend only no-cache
+#
+# Extra flags (append after mode):
+#   --with-data   Re-import GPKG geodata after rebuild
+#   --bake        Warm up Redis tile cache after rebuild
+#   --down        docker compose down before rebuild
 
 set -euo pipefail
 
@@ -33,63 +40,108 @@ warn()    { echo -e "${YELLOW}[!]${NC} $*"; }
 error()   { echo -e "${RED}[✗]${NC} $*" >&2; }
 header()  { echo -e "\n${BOLD}${CYAN}══════════════════════════════════════════${NC}"; echo -e "${BOLD}${CYAN}  $*${NC}"; echo -e "${BOLD}${CYAN}══════════════════════════════════════════${NC}\n"; }
 
-# Force classic Docker builder — buildx causes socket errors on this setup
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 
 # ── Defaults ──────────────────────────────────────────────────
-OPT_NO_CACHE=true
+OPT_NO_CACHE=false
 OPT_FRONTEND_ONLY=false
 OPT_BACKEND_ONLY=false
 OPT_WITH_DATA=false
 OPT_BAKE=false
 OPT_DOWN=false
+MODE_CHOSEN=""
 
-# ── Parse args ────────────────────────────────────────────────
-for arg in "$@"; do
-  case "$arg" in
-    --cache)         OPT_NO_CACHE=false ;;
-    --no-cache)      OPT_NO_CACHE=true ;;
-    --frontend-only) OPT_FRONTEND_ONLY=true ;;
-    --backend-only)  OPT_BACKEND_ONLY=true ;;
-    --with-data)     OPT_WITH_DATA=true ;;
-    --bake)          OPT_BAKE=true ;;
-    --down)          OPT_DOWN=true ;;
+# ── Menu ──────────────────────────────────────────────────────
+show_menu() {
+  echo -e "\n${BOLD}${CYAN}  kzmap rebuild${NC}\n"
+  echo -e "  ${BOLD}Полная пересборка${NC}"
+  echo -e "  ${GREEN}1)${NC} full  fast   — все сервисы, с кешем   ${YELLOW}(быстро)${NC}"
+  echo -e "  ${GREEN}2)${NC} full  slow   — все сервисы, без кеша   ${RED}(медленно, чисто)${NC}"
+  echo -e ""
+  echo -e "  ${BOLD}Только бэкенд${NC}"
+  echo -e "  ${GREEN}3)${NC} back  fast   — auth + map, с кешем     ${YELLOW}(быстро)${NC}"
+  echo -e "  ${GREEN}4)${NC} back  slow   — auth + map, без кеша    ${RED}(медленно, чисто)${NC}"
+  echo -e ""
+  echo -e "  ${BOLD}Только фронтенд${NC}"
+  echo -e "  ${GREEN}5)${NC} front fast   — frontend, с кешем       ${YELLOW}(быстро)${NC}"
+  echo -e "  ${GREEN}6)${NC} front slow   — frontend, без кеша      ${RED}(медленно, чисто)${NC}"
+  echo -e ""
+  echo -ne "  Выбери режим [1-6]: "
+}
+
+# ── Parse first arg as mode or flag ───────────────────────────
+EXTRA_ARGS=()
+if [ $# -gt 0 ]; then
+  case "$1" in
+    1|full-fast)      MODE_CHOSEN=1 ;;
+    2|full-slow)      MODE_CHOSEN=2 ;;
+    3|backend-fast)   MODE_CHOSEN=3 ;;
+    4|backend-slow)   MODE_CHOSEN=4 ;;
+    5|frontend-fast)  MODE_CHOSEN=5 ;;
+    6|frontend-slow)  MODE_CHOSEN=6 ;;
+    # Legacy flags kept for backward compat
+    --frontend-only)  MODE_CHOSEN=5 ;;
+    --backend-only)   MODE_CHOSEN=3 ;;
     --help)
       sed -n '/^# rebuild/,/^[^#]/{ /^[^#]/d; s/^# \{0,2\}//; p }' "$0"
       exit 0
       ;;
-    *)
-      error "Unknown option: $arg"
-      echo "Run with --help for usage."
-      exit 1
-      ;;
+    *) error "Unknown mode: $1. Run without args for interactive menu."; exit 1 ;;
+  esac
+  shift
+fi
+
+# Parse remaining flags
+for arg in "$@"; do
+  case "$arg" in
+    --with-data) OPT_WITH_DATA=true ;;
+    --bake)      OPT_BAKE=true ;;
+    --down)      OPT_DOWN=true ;;
+    --cache)     ;; # ignored, mode controls cache
+    --no-cache)  ;; # ignored, mode controls cache
+    *) error "Unknown flag: $arg"; exit 1 ;;
   esac
 done
+
+# Interactive menu if no mode given
+if [ -z "$MODE_CHOSEN" ]; then
+  show_menu
+  read -r MODE_CHOSEN
+fi
+
+# Apply mode
+case "$MODE_CHOSEN" in
+  1) OPT_NO_CACHE=false; OPT_FRONTEND_ONLY=false; OPT_BACKEND_ONLY=false; MODE_LABEL="Full fast" ;;
+  2) OPT_NO_CACHE=true;  OPT_FRONTEND_ONLY=false; OPT_BACKEND_ONLY=false; MODE_LABEL="Full slow (no-cache)" ;;
+  3) OPT_NO_CACHE=false; OPT_BACKEND_ONLY=true;   MODE_LABEL="Backend fast" ;;
+  4) OPT_NO_CACHE=true;  OPT_BACKEND_ONLY=true;   MODE_LABEL="Backend slow (no-cache)" ;;
+  5) OPT_NO_CACHE=false; OPT_FRONTEND_ONLY=true;  MODE_LABEL="Frontend fast" ;;
+  6) OPT_NO_CACHE=true;  OPT_FRONTEND_ONLY=true;  MODE_LABEL="Frontend slow (no-cache)" ;;
+  *) error "Invalid choice: $MODE_CHOSEN"; exit 1 ;;
+esac
 
 BUILD_ARGS=""
 $OPT_NO_CACHE && BUILD_ARGS="--no-cache"
 
-# ── Determine which services to rebuild ───────────────────────
 if $OPT_FRONTEND_ONLY; then
   BUILD_SERVICES="frontend"
 elif $OPT_BACKEND_ONLY; then
   BUILD_SERVICES="auth-service map-service"
 else
-  BUILD_SERVICES=""  # all
+  BUILD_SERVICES=""
 fi
 
 # ── Start ─────────────────────────────────────────────────────
-header "kzmap rebuild"
-log "Root:    $ROOT_DIR"
-log "Options: no-cache=$OPT_NO_CACHE | frontend-only=$OPT_FRONTEND_ONLY | backend-only=$OPT_BACKEND_ONLY | with-data=$OPT_WITH_DATA | bake=$OPT_BAKE"
+header "kzmap rebuild — $MODE_LABEL"
+log "Root: $ROOT_DIR"
 echo ""
 
 cd "$BACKEND_DIR"
 
-# ── Step 1: Down (optional) ───────────────────────────────────
+# ── Step 1: Down / Stop ───────────────────────────────────────
 if $OPT_DOWN; then
-  log "Stopping and removing containers..."
+  log "Removing containers..."
   docker compose down
   success "Containers removed"
 else
@@ -98,25 +150,25 @@ else
 fi
 
 # ── Step 2: Build ─────────────────────────────────────────────
-header "Building Docker images"
+header "Building"
 
 if [ -n "$BUILD_SERVICES" ]; then
-  log "Building: $BUILD_SERVICES"
+  log "Services: $BUILD_SERVICES"
   # shellcheck disable=SC2086
   docker compose build $BUILD_ARGS $BUILD_SERVICES
 else
-  log "Building all services..."
+  log "All services..."
   docker compose build $BUILD_ARGS
 fi
 success "Images built"
 
 # ── Step 3: Start ─────────────────────────────────────────────
-header "Starting services"
+header "Starting"
 docker compose up -d --force-recreate --remove-orphans
 success "Containers started"
 
-# ── Step 4: Wait for health ───────────────────────────────────
-log "Waiting for services to become healthy..."
+# ── Step 4: Health check ──────────────────────────────────────
+log "Waiting for services..."
 
 wait_healthy() {
   local container="$1"
@@ -137,60 +189,60 @@ wait_healthy() {
   return 1
 }
 
-wait_healthy "kzmap-postgres" 90
-wait_healthy "kzmap-redis"    30
-wait_healthy "kzmap-auth-service" 60
-wait_healthy "kzmap-map-service"  60
-
-echo ""
-success "All services healthy"
-
-# ── Step 5: Cache — flush Redis ───────────────────────────────
-header "Cache"
-log "Flushing Redis tile cache..."
-if docker exec kzmap-redis redis-cli FLUSHALL > /dev/null 2>&1; then
-  success "Redis cache flushed"
+if $OPT_FRONTEND_ONLY; then
+  : # skip health checks for frontend-only
 else
-  warn "Could not flush Redis (container may not be ready)"
+  wait_healthy "kzmap-postgres"     90
+  wait_healthy "kzmap-redis"        30
+  wait_healthy "kzmap-auth-service" 60
+  wait_healthy "kzmap-map-service"  60
+  echo ""
+  success "All services healthy"
 fi
 
-# ── Step 6: DB indices / ANALYZE ──────────────────────────────
-log "Running ANALYZE on geo_objects..."
-if docker exec -e PGPASSWORD=kzmap_password kzmap-postgres \
-    psql -U kzmap_user -d kzmap -c "ANALYZE geo_objects;" > /dev/null 2>&1; then
-  success "geo_objects analyzed"
-else
-  warn "ANALYZE skipped (table may not exist yet)"
+# ── Step 5: Redis flush (skip on frontend-only) ───────────────
+if ! $OPT_FRONTEND_ONLY; then
+  header "Cache"
+  log "Flushing Redis tile cache..."
+  if docker exec kzmap-redis redis-cli FLUSHALL > /dev/null 2>&1; then
+    success "Redis cache flushed"
+  else
+    warn "Could not flush Redis"
+  fi
+
+  log "Running ANALYZE on geo_objects..."
+  if docker exec -e PGPASSWORD=kzmap_password kzmap-postgres \
+      psql -U kzmap_user -d kzmap -c "ANALYZE geo_objects;" > /dev/null 2>&1; then
+    success "geo_objects analyzed"
+  else
+    warn "ANALYZE skipped (table may not exist yet)"
+  fi
 fi
 
-# ── Step 7: Re-import geodata (optional) ──────────────────────
+# ── Step 6: Geodata import (optional) ────────────────────────
 if $OPT_WITH_DATA; then
-  header "Importing GPKG geodata"
+  header "Importing geodata"
   if [ -f "$BACKEND_DIR/load_all_gpkg.sh" ]; then
-    log "Running load_all_gpkg.sh..."
     bash "$BACKEND_DIR/load_all_gpkg.sh"
     success "Geodata imported"
   else
-    error "load_all_gpkg.sh not found at $BACKEND_DIR/load_all_gpkg.sh"
-    exit 1
+    error "load_all_gpkg.sh not found"; exit 1
   fi
 fi
 
-# ── Step 8: Bake tile cache (optional) ────────────────────────
+# ── Step 7: Bake cache (optional) ────────────────────────────
 if $OPT_BAKE; then
   header "Baking tile cache"
   if [ -f "$BACKEND_DIR/bake_map.sh" ]; then
-    log "Running bake_map.sh..."
     bash "$BACKEND_DIR/bake_map.sh"
     success "Tile cache baked"
   else
-    error "bake_map.sh not found at $BACKEND_DIR/bake_map.sh"
-    exit 1
+    error "bake_map.sh not found"; exit 1
   fi
 fi
 
-# ── Final status ──────────────────────────────────────────────
-header "Status"
+# ── Done ──────────────────────────────────────────────────────
+header "Done — $MODE_LABEL"
 docker compose ps
 echo ""
 success "Rebuild complete!"

@@ -7,12 +7,12 @@ import { getAdvancedStyle } from '../../types/editor'
 import { useEditorStore } from '../../store/editorStore'
 import { useViewerStore } from '../../store/viewerStore'
 
-const DISABLED_TYPES = new Set(['building', 'city'])
+const DISABLED_TYPES = new Set(['building', 'city', 'custom', 'other', 'mountain', 'boundary'])
 
 export default function VectorTileLayer() {
     const map = useMap()
     const layerRef = useRef<any>(null)
-    const visibleLayersRef = useRef<Set<string>>(new Set(['lake', 'river', 'forest', 'road', 'mountain', 'boundary', 'other']))
+    const visibleLayersRef = useRef<Set<string>>(new Set(['lake', 'river', 'forest', 'road']))
     const featureClassFilterRef = useRef<string>('')
     const isViewer = window.location.pathname.startsWith('/map')
 
@@ -129,6 +129,17 @@ export default function VectorTileLayer() {
                     containerPoint: e.containerPoint,
                     originalEvent: e.originalEvent,
                     featureProperties: props || null,
+                })
+                return
+            }
+
+            // For measure tool: forward click without featureProperties so DistanceMeasureTool receives it
+            if (tool === 'measure') {
+                map.fireEvent('click', {
+                    latlng,
+                    layerPoint: e.layerPoint,
+                    containerPoint: e.containerPoint,
+                    originalEvent: e.originalEvent,
                 })
                 return
             }

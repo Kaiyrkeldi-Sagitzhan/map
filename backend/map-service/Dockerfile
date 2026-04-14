@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o /map-service ./cmd/main.go
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 

@@ -4,7 +4,7 @@
  * Bottom: floating toolbar pill + coordinate display.
  */
 import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, ScaleControl, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -17,7 +17,6 @@ import CoordinateDisplay from './CoordinateDisplay'
 import GeomanController from './GeomanController'
 import SearchResults from './SearchResults'
 import TextSearch from './TextSearch'
-import ZoomPicker from './ZoomPicker'
 import VectorTileLayer from '../Map/VectorTileLayer'
 import DistanceMeasureTool from '../Map/DistanceMeasureTool'
 
@@ -149,14 +148,11 @@ const MapEditor = () => {
                     <DistanceMeasureTool active={currentTool === 'measure'} />
                     <TextSearch />
 
-                    {/* Visual enhancements */}
-                    <ScaleControl position="bottomleft" />
-                    <ZoomPicker />
+                    <CoordinateDisplay />
                 </MapContainer>
 
                 {/* Overlays (Zustand based) */}
                 <Toolbar />
-                <CoordinateDisplay />
                 <SearchResults />
             </main>
 
