@@ -43,6 +43,10 @@ header()  { echo -e "\n${BOLD}${CYAN}══════════════�
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
 
+COMPOSE_BACKEND="-f $ROOT_DIR/docker-compose.backend.yml"
+COMPOSE_FRONTEND="-f $ROOT_DIR/docker-compose.frontend.yml"
+COMPOSE_ALL="$COMPOSE_BACKEND $COMPOSE_FRONTEND"
+
 # ── Defaults ──────────────────────────────────────────────────
 OPT_NO_CACHE=false
 OPT_FRONTEND_ONLY=false
@@ -124,12 +128,13 @@ esac
 BUILD_ARGS=""
 $OPT_NO_CACHE && BUILD_ARGS="--no-cache"
 
+# Determine which compose files to use
 if $OPT_FRONTEND_ONLY; then
-  BUILD_SERVICES="frontend"
+  COMPOSE_USE="$COMPOSE_FRONTEND"
 elif $OPT_BACKEND_ONLY; then
-  BUILD_SERVICES="auth-service map-service"
+  COMPOSE_USE="$COMPOSE_BACKEND"
 else
-  BUILD_SERVICES=""
+  COMPOSE_USE="$COMPOSE_ALL"
 fi
 
 # ── Start ─────────────────────────────────────────────────────
@@ -137,34 +142,50 @@ header "kzmap rebuild — $MODE_LABEL"
 log "Root: $ROOT_DIR"
 echo ""
 
-cd "$BACKEND_DIR"
+cd "$ROOT_DIR"
 
 # ── Step 1: Down / Stop ───────────────────────────────────────
 if $OPT_DOWN; then
   log "Removing containers..."
-  docker compose down
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_USE down
   success "Containers removed"
 else
   log "Stopping running containers (keeping volumes)..."
-  docker compose stop 2>/dev/null || true
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_USE stop 2>/dev/null || true
 fi
 
 # ── Step 2: Build ─────────────────────────────────────────────
 header "Building"
 
-if [ -n "$BUILD_SERVICES" ]; then
-  log "Services: $BUILD_SERVICES"
+# For full rebuild: build backend first (frontend needs backend network)
+if ! $OPT_FRONTEND_ONLY && ! $OPT_BACKEND_ONLY; then
+  log "Building backend..."
   # shellcheck disable=SC2086
-  docker compose build $BUILD_ARGS $BUILD_SERVICES
+  docker compose $COMPOSE_BACKEND build $BUILD_ARGS
+  log "Building frontend..."
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_FRONTEND build $BUILD_ARGS
 else
-  log "All services..."
-  docker compose build $BUILD_ARGS
+  log "Building..."
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_USE build $BUILD_ARGS
 fi
 success "Images built"
 
 # ── Step 3: Start ─────────────────────────────────────────────
 header "Starting"
-docker compose up -d --force-recreate --remove-orphans
+
+# Backend must start first so the external network exists for frontend
+if ! $OPT_FRONTEND_ONLY; then
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_BACKEND up -d --force-recreate --remove-orphans
+fi
+if ! $OPT_BACKEND_ONLY; then
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE_FRONTEND up -d --force-recreate --remove-orphans
+fi
 success "Containers started"
 
 # ── Step 4: Health check ──────────────────────────────────────
@@ -243,7 +264,8 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────
 header "Done — $MODE_LABEL"
-docker compose ps
+# shellcheck disable=SC2086
+docker compose $COMPOSE_USE ps
 echo ""
 success "Rebuild complete!"
 echo ""
@@ -251,4 +273,5 @@ echo -e "  Frontend  → ${CYAN}http://localhost:3000${NC}"
 echo -e "  API       → ${CYAN}http://localhost:8080${NC}"
 echo -e "  Auth      → ${CYAN}http://localhost:8081${NC}"
 echo -e "  Map       → ${CYAN}http://localhost:8082${NC}"
+echo -e "  Swagger   → ${CYAN}http://localhost:8083${NC}"
 echo ""
