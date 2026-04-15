@@ -22,7 +22,7 @@ func main() {
 		deployPath = "/home/ask/GitHub/map"
 	}
 
-	http.HandleFunc("/deploy/", func(w http.ResponseWriter, r *http.Request) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received %s request for %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 		
 		if r.Method != http.MethodPost {
@@ -64,8 +64,6 @@ func main() {
 			pullCmd.Stderr = os.Stderr
 			if err := pullCmd.Run(); err != nil {
 				log.Printf("Git pull failed: %v", err)
-				// We don't return here because maybe pull failed but we still want to try rebuild
-				// (e.g. if repo is already up to date or local changes exist)
 			} else {
 				log.Println("Git pull successful")
 			}
@@ -81,7 +79,10 @@ func main() {
 				log.Println("Rebuild complete")
 			}
 		}()
-	})
+	}
+
+	http.HandleFunc("/deploy", handler)
+	http.HandleFunc("/deploy/", handler)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
