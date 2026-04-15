@@ -161,5 +161,15 @@ echo "-------------------------------------------------"
 echo "Finalizing Pro Import..."
 run_psql "ANALYZE geo_objects;"
 
+echo "Refreshing stats materialized view..."
+run_psql "
+  CREATE MATERIALIZED VIEW IF NOT EXISTS geo_object_type_stats AS
+  SELECT type, COUNT(*)::int AS count,
+         ST_AsGeoJSON(ST_Centroid(ST_Extent(geometry)))::text AS centroid_json
+  FROM geo_objects WHERE scope = 'global' GROUP BY type ORDER BY count DESC;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_geo_object_type_stats_type ON geo_object_type_stats(type);
+  REFRESH MATERIALIZED VIEW geo_object_type_stats;
+"
+
 echo "PRO DONE! Every attribute is now in the 'metadata' column."
 run_psql "SELECT count(*) FROM geo_objects;"
