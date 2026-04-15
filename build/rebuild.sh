@@ -232,14 +232,22 @@ if ! $OPT_FRONTEND_ONLY; then
   fi
 fi
 
-# ── Step 6: Geodata import (optional) ────────────────────────
+# ── Step 6: Geodata import (только если база пустая) ─────────
 if $OPT_WITH_DATA; then
-  header "Importing geodata"
-  if [ -f "$BACKEND_DIR/load_all_gpkg.sh" ]; then
-    bash "$BACKEND_DIR/load_all_gpkg.sh"
-    success "Geodata imported"
+  header "Checking geodata"
+  GEO_COUNT=$(docker exec -e PGPASSWORD=kzmap_password kzmap-postgres \
+    psql -U kzmap_user -d kzmap -t -c "SELECT count(*) FROM geo_objects;" 2>/dev/null | tr -d ' ' || echo "0")
+  log "Объектов в базе: $GEO_COUNT"
+  if [ "${GEO_COUNT:-0}" -lt 1000 ]; then
+    log "База пустая — запускаем импорт..."
+    if [ -f "$BACKEND_DIR/load_all_gpkg.sh" ]; then
+      bash "$BACKEND_DIR/load_all_gpkg.sh"
+      success "Geodata imported"
+    else
+      error "load_all_gpkg.sh not found"; exit 1
+    fi
   else
-    error "load_all_gpkg.sh not found"; exit 1
+    success "Данные уже есть ($GEO_COUNT объектов) — импорт пропущен"
   fi
 fi
 
