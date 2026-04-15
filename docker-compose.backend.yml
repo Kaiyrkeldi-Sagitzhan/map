@@ -171,10 +171,10 @@ services:
     container_name: kzmap-webhook
     environment:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      DEPLOY_PATH: ${DEPLOY_PATH:-/home/ask/map}
+      DEPLOY_PATH: ${DEPLOY_PATH:-/home/ask/GitHub/map}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${DEPLOY_PATH:-/home/ask/map}:${DEPLOY_PATH:-/home/ask/map}
+      - ${DEPLOY_PATH:-/home/ask/GitHub/map}:${DEPLOY_PATH:-/home/ask/GitHub/map}
     ports:
       - "9001:9000"
     networks:

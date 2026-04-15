@@ -5,7 +5,7 @@ COPY main.go .
 RUN go build -o webhook .
 
 FROM alpine:3.19
-RUN apk add --no-cache bash git docker-cli
+RUN apk add --no-cache bash git docker-cli docker-cli-compose
 WORKDIR /app
 COPY --from=builder /app/webhook .
 EXPOSE 9000

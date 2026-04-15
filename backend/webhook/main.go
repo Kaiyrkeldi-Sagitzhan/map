@@ -19,7 +19,7 @@ func main() {
 
 	deployPath := os.Getenv("DEPLOY_PATH")
 	if deployPath == "" {
-		deployPath = "/home/ask/map"
+		deployPath = "/home/ask/GitHub/map"
 	}
 
 	http.HandleFunc("/deploy", func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,23 @@ func main() {
 
 		// Run rebuild in background
 		go func() {
-			cmd := exec.Command("bash", deployPath+"/build/rebuild.sh", "1")
+			log.Printf("Starting code update in %s", deployPath)
+			
+			// 1. Git pull
+			pullCmd := exec.Command("git", "pull", "origin", "main")
+			pullCmd.Dir = deployPath
+			pullCmd.Stdout = os.Stdout
+			pullCmd.Stderr = os.Stderr
+			if err := pullCmd.Run(); err != nil {
+				log.Printf("Git pull failed: %v", err)
+				// We don't return here because maybe pull failed but we still want to try rebuild
+				// (e.g. if repo is already up to date or local changes exist)
+			} else {
+				log.Println("Git pull successful")
+			}
+
+			// 2. Rebuild
+			cmd := exec.Command("bash", "build/rebuild.sh", "1")
 			cmd.Dir = deployPath
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
