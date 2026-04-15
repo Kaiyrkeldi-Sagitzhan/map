@@ -248,6 +248,12 @@ if $OPT_WITH_DATA; then
     fi
   else
     success "Данные уже есть ($GEO_COUNT объектов) — импорт пропущен"
+    log "Refreshing stats materialized view..."
+    docker exec -e PGPASSWORD=kzmap_password kzmap-postgres \
+      psql -U kzmap_user -d kzmap -c "REFRESH MATERIALIZED VIEW CONCURRENTLY geo_object_type_stats;" > /dev/null 2>&1 && \
+      success "Stats view refreshed" || warn "Stats view refresh skipped (will be created on first import)"
+    log "Flushing stats cache in Redis..."
+    docker exec kzmap-redis redis-cli DEL dashboard:stats > /dev/null 2>&1 || true
   fi
 fi
 
