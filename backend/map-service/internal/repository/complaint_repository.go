@@ -154,7 +154,7 @@ type TypeStats struct {
 func (r *ComplaintRepository) GetStatsByType(ctx context.Context) ([]TypeStats, error) {
 	query := `
 		SELECT type, COUNT(*) as count,
-			   ST_AsGeoJSON(ST_Centroid(ST_Collect(geometry)))::text as centroid_json
+			   ST_AsGeoJSON(ST_Centroid(ST_Extent(geometry)))::text as centroid_json
 		FROM geo_objects
 		WHERE scope = 'global'
 		GROUP BY type

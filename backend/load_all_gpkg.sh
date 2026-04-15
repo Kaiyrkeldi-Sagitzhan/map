@@ -78,6 +78,14 @@ echo "================================================="
 echo "   ULTIMATE GeoPackage Attribute Importer"
 echo "================================================="
 
+# Check if we already have data
+COUNT=$(run_psql "SELECT count(*) FROM geo_objects;" | head -n 1 | grep -oE '^[0-9]+' || echo "0")
+if [ "${COUNT:-0}" -gt 10000 ] && [ "${FORCE_IMPORT:-false}" != "true" ]; then
+  echo "Database already contains $COUNT objects. Skipping import to prevent duplicates."
+  echo "Set FORCE_IMPORT=true to override and truncate existing data."
+  exit 0
+fi
+
 # Prevent concurrent runs that can create conflicting temp objects.
 LOCK_FILE="$SCRIPT_DIR/.load_all_gpkg.lock"
 if [ -f "$LOCK_FILE" ]; then
@@ -92,8 +100,10 @@ fi
 trap 'rm -f "$LOCK_FILE"' EXIT
 echo "$$" > "$LOCK_FILE"
 
-echo "Cleaning up existing data..."
-run_psql "TRUNCATE TABLE geo_objects CASCADE;"
+if [ "${FORCE_IMPORT:-false}" == "true" ]; then
+  echo "Cleaning up existing data (FORCE_IMPORT=true)..."
+  run_psql "TRUNCATE TABLE geo_objects CASCADE;"
+fi
 
 load_layer_pro() {
   local layer_name="$1"

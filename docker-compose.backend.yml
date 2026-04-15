@@ -142,24 +142,18 @@ services:
       - kzmap-network
     entrypoint: >
       sh -c "
-      echo 'Running all migrations (idempotent)...';
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/005_area_metadata.sql;
+      echo 'Applying database migrations (idempotent)...';
+      for f in database/migrations/*.sql; do
+        echo \"Running $$f...\";
+        psql -h postgres -U kzmap_user -d kzmap -f \"$$f\" || echo \"Warning: $$f failed\";
+      done;
       echo 'Migrations done.';
-      echo 'Loading geodata if gpkg exists...';
+      
+      echo 'Automatic geodata check...';
       if [ -f gpkg_data/kazakhstan.gpkg ]; then
-        count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM geo_objects;\");
-        if [ $$count -lt 500000 ]; then
-          echo 'Less than 500k objects, running full import...';
-          DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
-        else
-          echo \"Already have $$count objects, skipping import.\";
-        fi;
+        DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
       else
-        echo 'No gpkg file found.';
+        echo 'No gpkg file found at backend/gpkg_data/kazakhstan.gpkg. Skipping automatic import.';
       fi;
       "
 
