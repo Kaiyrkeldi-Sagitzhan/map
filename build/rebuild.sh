@@ -60,32 +60,26 @@ MODE_CHOSEN=""
 show_menu() {
   echo -e "\n${BOLD}${CYAN}  kzmap rebuild${NC}\n"
   echo -e "  ${BOLD}Полная пересборка${NC}"
-  echo -e "  ${GREEN}1)${NC} full  fast   — все сервисы, с кешем   ${YELLOW}(быстро)${NC}"
-  echo -e "  ${GREEN}2)${NC} full  slow   — все сервисы, без кеша   ${RED}(медленно, чисто)${NC}"
+  echo -e "  ${GREEN}1)${NC} full  ready   — все сервисы, проверка данных, прогрев кеша ${YELLOW}(быстро)${NC}"
+  echo -e "  ${GREEN}2)${NC} full  clean   — чистая пересборка без кеша ${RED}(медленно)${NC}"
   echo -e ""
-  echo -e "  ${BOLD}Только бэкенд${NC}"
-  echo -e "  ${GREEN}3)${NC} back  fast   — auth + map, с кешем     ${YELLOW}(быстро)${NC}"
-  echo -e "  ${GREEN}4)${NC} back  slow   — auth + map, без кеша    ${RED}(медленно, чисто)${NC}"
+  echo -e "  ${BOLD}Быстрые режимы${NC}"
+  echo -e "  ${GREEN}3)${NC} back  fast    — только бэкенд (auth + map)"
+  echo -e "  ${GREEN}4)${NC} front fast    — только фронтенд"
   echo -e ""
-  echo -e "  ${BOLD}Только фронтенд${NC}"
-  echo -e "  ${GREEN}5)${NC} front fast   — frontend, с кешем       ${YELLOW}(быстро)${NC}"
-  echo -e "  ${GREEN}6)${NC} front slow   — frontend, без кеша      ${RED}(медленно, чисто)${NC}"
-  echo -e ""
-  echo -ne "  Выбери режим [1-6]: "
+  echo -ne "  Выбери режим [1-4]: "
 }
 
 # ── Parse first arg as mode or flag ───────────────────────────
 EXTRA_ARGS=()
 if [ $# -gt 0 ]; then
   case "$1" in
-    1|full-fast)      MODE_CHOSEN=1 ;;
-    2|full-slow)      MODE_CHOSEN=2 ;;
-    3|backend-fast)   MODE_CHOSEN=3 ;;
-    4|backend-slow)   MODE_CHOSEN=4 ;;
-    5|frontend-fast)  MODE_CHOSEN=5 ;;
-    6|frontend-slow)  MODE_CHOSEN=6 ;;
+    1|full-fast|full-ready) MODE_CHOSEN=1 ;;
+    2|full-slow|full-clean) MODE_CHOSEN=2 ;;
+    3|backend-fast)         MODE_CHOSEN=3 ;;
+    4|frontend-fast)        MODE_CHOSEN=4 ;;
     # Legacy flags kept for backward compat
-    --frontend-only)  MODE_CHOSEN=5 ;;
+    --frontend-only)  MODE_CHOSEN=4 ;;
     --backend-only)   MODE_CHOSEN=3 ;;
     --help)
       sed -n '/^# rebuild/,/^[^#]/{ /^[^#]/d; s/^# \{0,2\}//; p }' "$0"
@@ -116,12 +110,10 @@ fi
 
 # Apply mode
 case "$MODE_CHOSEN" in
-  1) OPT_NO_CACHE=false; OPT_FRONTEND_ONLY=false; OPT_BACKEND_ONLY=false; MODE_LABEL="Full fast" ;;
-  2) OPT_NO_CACHE=true;  OPT_FRONTEND_ONLY=false; OPT_BACKEND_ONLY=false; MODE_LABEL="Full slow (no-cache)" ;;
-  3) OPT_NO_CACHE=false; OPT_BACKEND_ONLY=true;   MODE_LABEL="Backend fast" ;;
-  4) OPT_NO_CACHE=true;  OPT_BACKEND_ONLY=true;   MODE_LABEL="Backend slow (no-cache)" ;;
-  5) OPT_NO_CACHE=false; OPT_FRONTEND_ONLY=true;  MODE_LABEL="Frontend fast" ;;
-  6) OPT_NO_CACHE=true;  OPT_FRONTEND_ONLY=true;  MODE_LABEL="Frontend slow (no-cache)" ;;
+  1) OPT_NO_CACHE=false; OPT_WITH_DATA=true; OPT_BAKE=true;  MODE_LABEL="Full Ready" ;;
+  2) OPT_NO_CACHE=true;  OPT_WITH_DATA=true; OPT_BAKE=true;  MODE_LABEL="Full Clean (with data check)" ;;
+  3) OPT_NO_CACHE=false; OPT_BACKEND_ONLY=true;              MODE_LABEL="Backend Only" ;;
+  4) OPT_NO_CACHE=false; OPT_FRONTEND_ONLY=true;             MODE_LABEL="Frontend Only" ;;
   *) error "Invalid choice: $MODE_CHOSEN"; exit 1 ;;
 esac
 
