@@ -22,8 +22,11 @@ func main() {
 		deployPath = "/home/ask/GitHub/map"
 	}
 
-	http.HandleFunc("/deploy", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/deploy/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Received %s request for %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+		
 		if r.Method != http.MethodPost {
+			log.Printf("Method %s not allowed for %s", r.Method, r.URL.Path)
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
