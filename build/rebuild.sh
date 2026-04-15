@@ -153,7 +153,12 @@ if $OPT_DOWN; then
 else
   log "Stopping running containers (keeping volumes)..."
   # shellcheck disable=SC2086
+  # Use --scale to avoid stopping the webhook service if it exists in the compose file
   docker compose $COMPOSE_USE stop 2>/dev/null || true
+  # Ensure webhook stays up if it was stopped by mistake or needs to be up
+  if ! $OPT_FRONTEND_ONLY; then
+     docker compose $COMPOSE_BACKEND start webhook 2>/dev/null || true
+  fi
 fi
 
 # ── Step 2: Build ─────────────────────────────────────────────
