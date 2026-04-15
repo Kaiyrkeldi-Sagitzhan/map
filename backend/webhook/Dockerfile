@@ -6,6 +6,7 @@ RUN go build -o webhook .
 
 FROM alpine:3.19
 RUN apk add --no-cache bash git docker-cli docker-cli-compose
+RUN git config --global --add safe.directory /home/ask/GitHub/map
 WORKDIR /app
 COPY --from=builder /app/webhook .
 EXPOSE 9000
