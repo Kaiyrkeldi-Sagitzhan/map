@@ -77,4 +77,4 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Deploy-Signature: $SIG" \
             -d "$PAYLOAD" \
-            https://map.aetherion.work/deploy/
+            https://map.aetherion.work/trigger-rebuild/

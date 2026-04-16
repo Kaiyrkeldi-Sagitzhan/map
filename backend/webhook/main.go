@@ -81,8 +81,8 @@ func main() {
 		}()
 	}
 
-	http.HandleFunc("/deploy", handler)
-	http.HandleFunc("/deploy/", handler)
+	http.HandleFunc("/trigger-rebuild", handler)
+	http.HandleFunc("/trigger-rebuild/", handler)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
