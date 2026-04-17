@@ -1,9 +1,7 @@
 /**
- * ViewerToolbar.tsx — Floating toolbar for the viewer with type filter dropdown.
+ * ViewerToolbar.tsx — Floating toolbar for the viewer.
  */
-import { useState, useRef, useEffect } from 'react'
 import { useViewerStore } from '../../store/viewerStore'
-import { getSafeStyle } from '../../types/editor'
 import {
     MousePointer2,
     Ruler,
@@ -11,33 +9,26 @@ import {
     History,
     AlertCircle,
     Eye,
-    EyeOff,
-    ChevronDown
+    EyeOff
 } from 'lucide-react'
 
-const VIEWER_TYPES = [
-    { value: '', label: 'Все типы', color: '#6b7280' },
-    { value: 'lake', label: 'Озёра' },
-    { value: 'river', label: 'Реки' },
-    { value: 'forest', label: 'Леса' },
-    { value: 'road', label: 'Дороги' },
+const AREA_LAYER_OPTIONS = [
+    { id: 'lake', label: 'Озера' },
+    { id: 'river', label: 'Реки' },
+    { id: 'forest', label: 'Леса' },
+    { id: 'road', label: 'Дороги' },
 ]
 
 export default function ViewerToolbar() {
-    const { showMap, setShowMap, activeTool, setActiveTool, featureClassFilter, setFeatureClassFilter } = useViewerStore()
-    const [showClassMenu, setShowClassMenu] = useState(false)
-    const classMenuRef = useRef<HTMLDivElement>(null)
-
-    // Close dropdown on outside click
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (classMenuRef.current && !classMenuRef.current.contains(e.target as Node)) {
-                setShowClassMenu(false)
-            }
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [])
+    const {
+        showMap,
+        setShowMap,
+        activeTool,
+        setActiveTool,
+        searchAreaLayers,
+        toggleSearchAreaLayer,
+        resetSearchAreaLayers,
+    } = useViewerStore()
 
     const toolBtn = (tool: typeof activeTool, icon: React.ReactNode, title: string, isComplaint = false) => {
         const active = activeTool === tool
@@ -60,11 +51,9 @@ export default function ViewerToolbar() {
         )
     }
 
-    const currentType = VIEWER_TYPES.find(t => t.value === featureClassFilter) || VIEWER_TYPES[0]
-    const dotColor = featureClassFilter ? getSafeStyle(featureClassFilter).fillColor : '#6b7280'
-
     return (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[5000] flex items-center gap-2 pointer-events-auto">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[5000] pointer-events-auto">
+            <div className="relative w-fit">
             {/* Main toolbar pill */}
             <div className="flex items-center gap-0.5 bg-[#020C1B] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
                 {toolBtn('select', <MousePointer2 size={18} />, 'Выделение')}
@@ -92,57 +81,6 @@ export default function ViewerToolbar() {
 
                 {/* Divider */}
                 <div className="w-px h-6 bg-white/10 mx-1.5" />
-
-                {/* Type filter dropdown */}
-                <div className="relative" ref={classMenuRef}>
-                    <button
-                        onClick={() => setShowClassMenu(!showClassMenu)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 ${
-                            showClassMenu
-                                ? 'bg-white/10 text-white'
-                                : featureClassFilter
-                                    ? 'text-white bg-white/5'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                        }`}
-                    >
-                        <div
-                            className="w-3 h-3 rounded-full border border-white/20 shadow-sm"
-                            style={{ backgroundColor: dotColor }}
-                        />
-                        <span className="hidden sm:inline">{currentType.label}</span>
-                        <ChevronDown size={14} className={`transition-transform duration-200 ${showClassMenu ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {showClassMenu && (
-                        <div className="absolute bottom-full mb-3 right-0 bg-[#020C1B] rounded-2xl shadow-2xl border border-white/10 py-2 min-w-[200px] animate-in fade-in slide-in-from-bottom-2 duration-200">
-                            <div className="px-4 py-2 mb-1 border-b border-white/5">
-                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Тип объекта</span>
-                            </div>
-                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar px-1">
-                                {VIEWER_TYPES.map((vt) => (
-                                    <button
-                                        key={vt.value}
-                                        onClick={() => {
-                                            setFeatureClassFilter(vt.value)
-                                            setShowClassMenu(false)
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
-                                            featureClassFilter === vt.value
-                                                ? 'bg-[#10B981]/10 text-[#10B981]'
-                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
-                                        }`}
-                                    >
-                                        <div
-                                            className="w-3 h-3 rounded-full border border-white/10 shadow-sm"
-                                            style={{ backgroundColor: vt.color || getSafeStyle(vt.value).fillColor }}
-                                        />
-                                        <span>{vt.label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
             </div>
 
             {/* Tooltips */}
@@ -152,8 +90,34 @@ export default function ViewerToolbar() {
                 </div>
             )}
             {activeTool === 'searchArea' && (
-                <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap px-4 py-2 bg-[#10B981]/90 text-[#020C1B] rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
-                    Кликайте для полигона · Shift+drag для прямоугольника · Dbl-click завершить
+                <div className="absolute bottom-full mb-3 left-0 w-full bg-[#020C1B]/95 border border-white/10 rounded-2xl shadow-2xl p-3 origin-bottom animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Поиск по площади</span>
+                        <button
+                            onClick={resetSearchAreaLayers}
+                            className="text-[8px] font-bold uppercase tracking-wider text-[#10B981] hover:text-white transition-colors"
+                        >
+                            Все слои
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        {AREA_LAYER_OPTIONS.map((layer) => {
+                            const enabled = searchAreaLayers.has(layer.id)
+                            return (
+                                <button
+                                    key={layer.id}
+                                    onClick={() => toggleSearchAreaLayer(layer.id)}
+                                    className={`flex items-center justify-between px-2.5 py-2 rounded-lg border transition-all ${enabled ? 'bg-[#10B981]/10 border-[#10B981]/40 text-[#10B981]' : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white'}`}
+                                >
+                                    <span className="text-[9px] font-bold uppercase tracking-wide">{layer.label}</span>
+                                    <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-[#10B981]' : 'bg-slate-600'}`} />
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <div className="mt-2 text-[8px] text-slate-500 uppercase tracking-wider">
+                        Кликайте для полигона · Shift+drag для прямоугольника · Dbl-click завершить
+                    </div>
                 </div>
             )}
             {activeTool === 'measure' && (
@@ -161,6 +125,7 @@ export default function ViewerToolbar() {
                     Кликайте по точкам · ПКМ или ESC сброс
                 </div>
             )}
+            </div>
         </div>
     )
 }
