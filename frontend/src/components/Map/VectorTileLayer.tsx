@@ -105,8 +105,8 @@ export default function VectorTileLayer() {
             console.log('[VTL] click', { tool, isViewerPage, featureId: props?.id, featureType: props?.type, props })
 
             // Block clicks on non-matching types when viewer filter is active
-            // (except searchArea — Geoman handles its own click processing)
-            if (isViewerPage && tool !== 'searchArea') {
+            // (except tools that need raw map click processing)
+            if (isViewerPage && tool !== 'searchArea' && tool !== 'measure') {
                 const filter = useViewerStore.getState().featureClassFilter
                 const featureType = props?.type
                 if (DISABLED_TYPES.has(featureType)) {
@@ -119,7 +119,7 @@ export default function VectorTileLayer() {
             }
 
             // Forward clicks to map for all interactive tools, including feature properties
-            if (tool === 'edit' || tool === 'history' || tool === 'select' || tool === 'complaint' || tool === 'searchArea') {
+            if (tool === 'edit' || tool === 'history' || tool === 'select' || tool === 'complaint' || tool === 'searchArea' || tool === 'measure') {
                 // Mark the DOM event so MapViewer skips the native duplicate click
                 if (e.originalEvent) (e.originalEvent as any)._featureHandled = true
                 console.log('[VTL] forwarding click with featureProperties', { id: props?.id, type: props?.type })
@@ -138,7 +138,7 @@ export default function VectorTileLayer() {
         layer.on('mouseover', (e: any) => {
             const isViewerPage = window.location.pathname.startsWith('/map')
             const tool = isViewerPage ? useViewerStore.getState().activeTool : useEditorStore.getState().currentTool
-            if (tool === 'searchArea') return
+            if (tool === 'searchArea' || tool === 'measure') return
             if (isViewerPage) {
                 const filter = useViewerStore.getState().featureClassFilter
                 const featureType = e.layer?.properties?.type
@@ -149,7 +149,7 @@ export default function VectorTileLayer() {
         layer.on('mouseout', () => {
             const isViewerPage = window.location.pathname.startsWith('/map')
             const tool = isViewerPage ? useViewerStore.getState().activeTool : useEditorStore.getState().currentTool
-            if (tool === 'searchArea') return
+            if (tool === 'searchArea' || tool === 'measure') return
             map.getContainer().style.cursor = ''
         })
 

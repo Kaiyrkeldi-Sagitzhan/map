@@ -3,7 +3,7 @@ import { useViewerStore } from '../../store/viewerStore'
 import { Layers, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { getSafeLabel, getSafeStyle } from '../../types/editor'
 
-const LAYER_ORDER = ['lake', 'river', 'forest', 'road', 'mountain', 'boundary', 'other']
+const LAYER_ORDER = ['lake', 'river', 'forest', 'road', 'mountain', 'boundary']
 
 export default function ViewerLayersPanel() {
     const mapOpacity = useViewerStore((s) => s.mapOpacity)
