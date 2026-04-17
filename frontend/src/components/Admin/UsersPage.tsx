@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Pencil, Trash2, LogIn, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAdminStore } from '../../store/adminStore'
 import { useAuth } from '../../context/AuthContext'
@@ -8,7 +9,8 @@ import type { User } from '../../types'
 
 const UsersPage = () => {
   const { users, totalUsers, usersPage, usersSearch, usersLoading, fetchUsers, setUsersSearch, setUsersPage, deleteUser } = useAdminStore()
-  const { updateUser: setAuthUser } = useAuth()
+  const { setAuthData } = useAuth()
+  const navigate = useNavigate()
   const [editUser, setEditUser] = useState<User | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -35,10 +37,8 @@ const UsersPage = () => {
       if (currentUser) sessionStorage.setItem('admin_user', currentUser)
 
       const resp = await apiService.impersonateUser(user.id)
-      localStorage.setItem('token', resp.token)
-      localStorage.setItem('user', JSON.stringify(resp.user))
-      setAuthUser(resp.user)
-      window.location.href = resp.user.role === 'admin' ? '/editor' : '/map'
+      setAuthData(resp.token, resp.user)
+      navigate(resp.user.role === 'admin' ? '/editor' : '/map')
     } catch (e) {
       console.error('Impersonation failed:', e)
     }

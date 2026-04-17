@@ -28,6 +28,7 @@ Thumbs.db
 
 # Env
 .env
+docker-compose.yml
 
 # Go
 bin/

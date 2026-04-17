@@ -1,0 +1,720 @@
+openapi: 3.0.3
+info:
+  title: KZ Map — Auth Service
+  description: |
+    Authentication and user management API for the Kazakhstan Interactive Map Platform.
+
+    **Roles:** `admin`, `expert`, `user`
+
+    **Authentication:** Bearer JWT token — pass as `Authorization: Bearer <token>`.
+  version: 1.0.0
+  contact:
+    name: KZMap Team
+
+servers:
+  - url: https://map.aetherion.work/api/auth
+    description: Production (via API Gateway)
+  - url: http://localhost:8080/api/auth
+    description: Local (via API Gateway)
+  - url: http://localhost:8081/api/auth
+    description: Local (direct)
+
+tags:
+  - name: Auth
+    description: Registration, login, token refresh
+  - name: Email Verification
+    description: Email OTP verification before registration
+  - name: Google OAuth
+    description: Google OAuth 2.0 login
+  - name: Profile
+    description: Current user profile management
+  - name: Admin — Users
+    description: User management (admin only)
+
+paths:
+  # ─── Auth ────────────────────────────────────────────────────────────────────
+
+  /register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: |
+        Creates a new user account. Email must be verified first via `/verify/send` + `/verify`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: user@example.com
+              password: secret123
+              first_name: Aibek
+              last_name: Dzhaksybekov
+              nickname: aibek
+              role: user
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error / email not verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validation:
+                  value: { error: validation_error, message: "Key: 'RegisterRequest.Email' Error:Field validation for 'Email' failed" }
+                not_verified:
+                  value: { error: email_not_verified, message: "Please verify your email before registering" }
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example: { error: conflict, message: "User with this email already exists" }
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: user@example.com
+              password: secret123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example: { error: unauthorized, message: "Invalid email or password" }
+
+  /refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Email Verification ───────────────────────────────────────────────────────
+
+  /verify/send:
+    post:
+      tags: [Email Verification]
+      summary: Send 6-digit verification code to email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendVerificationCodeRequest'
+            example:
+              email: user@example.com
+      responses:
+        '200':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example: { message: "Verification code sent" }
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example: { error: rate_limit_exceeded, message: "Too many attempts. Please try again later." }
+
+  /verify:
+    post:
+      tags: [Email Verification]
+      summary: Verify email with 6-digit code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyCodeRequest'
+            example:
+              email: user@example.com
+              code: "123456"
+      responses:
+        '200':
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example: { message: "Email verified successfully" }
+        '400':
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  value: { error: invalid_code, message: "Invalid or expired verification code" }
+                expired:
+                  value: { error: code_expired, message: "Verification code has expired" }
+        '429':
+          description: Too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+  /google/url:
+    get:
+      tags: [Google OAuth]
+      summary: Get Google OAuth redirect URL
+      parameters:
+        - name: redirect_uri
+          in: query
+          description: Frontend callback URL (optional, auto-detected from Origin header)
+          required: false
+          schema:
+            type: string
+            example: https://map.aetherion.work/auth/google/callback
+      responses:
+        '200':
+          description: Google OAuth URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleOAuthURLResponse'
+
+  /google/callback:
+    get:
+      tags: [Google OAuth]
+      summary: Handle Google OAuth callback
+      description: Called by Google after user consent. Returns JWT token.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Missing code parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: OAuth error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Profile ──────────────────────────────────────────────────────────────────
+
+  /me:
+    get:
+      tags: [Profile]
+      summary: Get current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDTO'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags: [Profile]
+      summary: Update current user profile
+      description: |
+        Update name/nickname. To change password provide `current_password` + `new_password`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+            example:
+              first_name: Aibek
+              last_name: Dzhaksybekov
+              nickname: aibek_kz
+              current_password: oldpass
+              new_password: newpass123
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDTO'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Wrong current password / not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Admin — Users ────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      tags: [Admin — Users]
+      summary: List all users (paginated)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          description: Search by email, name, or nickname
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Admin — Users]
+      summary: Create a user (admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDTO'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}:
+    put:
+      tags: [Admin — Users]
+      summary: Update a user (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDTO'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Admin — Users]
+      summary: Delete a user (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example: { message: "User deleted successfully" }
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}/impersonate:
+    post:
+      tags: [Admin — Users]
+      summary: Get a JWT token for another user (admin impersonation)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200':
+          description: Token for target user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── Health ───────────────────────────────────────────────────────────────────
+
+  /../../health:
+    get:
+      tags: [Auth]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: auth-service
+
+# ─── Components ────────────────────────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /login or /register
+
+  parameters:
+    UserID:
+      name: id
+      in: path
+      required: true
+      description: User UUID
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+  schemas:
+    # ── Requests ──
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 6
+          example: secret123
+        role:
+          type: string
+          enum: [user, expert, admin]
+          default: user
+        first_name:
+          type: string
+          example: Aibek
+        last_name:
+          type: string
+          example: Dzhaksybekov
+        nickname:
+          type: string
+          example: aibek_kz
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          example: secret123
+
+    RefreshTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Existing JWT token
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        nickname:
+          type: string
+        current_password:
+          type: string
+          description: Required only if changing password
+        new_password:
+          type: string
+          minLength: 6
+
+    AdminCreateUserRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [user, expert, admin]
+        first_name:
+          type: string
+        last_name:
+          type: string
+        nickname:
+          type: string
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [user, expert, admin]
+        first_name:
+          type: string
+        last_name:
+          type: string
+        nickname:
+          type: string
+        password:
+          type: string
+          minLength: 6
+
+    SendVerificationCodeRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    VerifyCodeRequest:
+      type: object
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          example: "123456"
+
+    # ── Responses ──
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+        user:
+          $ref: '#/components/schemas/UserDTO'
+
+    UserDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [user, expert, admin]
+        first_name:
+          type: string
+        last_name:
+          type: string
+        nickname:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDTO'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    GoogleOAuthURLResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          description: Google OAuth consent page URL
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          description: Optional payload
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: validation_error
+        message:
+          type: string
+          description: Human-readable description
+          example: "Key: 'Email' Error: required"

@@ -14,10 +14,9 @@ const SEARCH_TYPES: { value: string; label: string }[] = [
     { value: 'river', label: 'Реки' },
     { value: 'forest', label: 'Леса' },
     { value: 'road', label: 'Дороги' },
-    { value: 'other', label: 'Другое' },
 ]
 
-const DISABLED_TYPES = new Set(['building', 'city'])
+const DISABLED_TYPES = new Set(['building', 'city', 'other', 'custom', 'mountain', 'boundary'])
 
 export default function ViewerTextSearch() {
     const map = useMap()

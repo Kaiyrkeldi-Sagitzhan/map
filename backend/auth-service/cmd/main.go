@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	_ "time/tzdata"
 
 	"auth-service/internal/config"
 	"auth-service/internal/handler"
@@ -56,9 +57,6 @@ func main() {
 	// Initialize repository
 	userRepository := repository.NewUserRepository(db)
 
-	// Initialize services
-	authService := service.NewAuthService(userRepository, tokenManager)
-
 	// Email service
 	emailService := service.NewEmailService(
 		cfg.SMTPHost,
@@ -70,6 +68,9 @@ func main() {
 
 	// Verification service
 	verificationService := service.NewVerificationService(emailService)
+
+	// Initialize services
+	authService := service.NewAuthService(userRepository, tokenManager, verificationService, emailService)
 
 	// Google OAuth service
 	googleOAuthService := service.NewGoogleOAuthService(

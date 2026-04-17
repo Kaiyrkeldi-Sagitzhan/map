@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { FEATURE_SCHEMAS } from '../../types/schema'
 
-const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road', 'other', 'custom']
+const FEATURE_CLASSES: FeatureClass[] = ['lake', 'river', 'forest', 'road']
 
 const ACTION_LABELS: Record<string, { label: string; color: string; bgColor: string }> = {
     create: { label: 'Создание', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10' },
@@ -236,7 +236,7 @@ export default function PropertiesPanel() {
 
         if (isCollapsed) {
             return (
-                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
+                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
                     <button
                         onClick={() => setIsCollapsed(false)}
                         className="w-full h-full flex items-center justify-center text-[#10B981] hover:text-white transition-colors"
@@ -249,7 +249,7 @@ export default function PropertiesPanel() {
         }
         
         return (
-            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B] border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
@@ -279,7 +279,7 @@ export default function PropertiesPanel() {
     if (!feature) {
         if (isCollapsed) {
             return (
-                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
+                <div className="fixed top-28 right-6 z-[500] w-12 h-12 rounded-xl bg-[#020C1B] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.4)]">
                     <button
                         onClick={() => setIsCollapsed(false)}
                         className="w-full h-full flex items-center justify-center text-[#10B981] hover:text-white transition-colors"
@@ -292,7 +292,7 @@ export default function PropertiesPanel() {
         }
 
         return (
-            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
+            <div className="fixed top-28 right-6 bottom-28 w-[320px] bg-[#020C1B] border border-white/10 flex flex-col z-[500] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[24px]">
                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/[0.02]">
                     <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Свойства объекта</h2>
                     <button onClick={() => setIsCollapsed(true)} className="p-2 rounded-xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"><ChevronRight size={16} /></button>
@@ -310,7 +310,7 @@ export default function PropertiesPanel() {
 
     return (
         <>
-        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B]/75 backdrop-blur-3xl border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'bottom-28 w-[320px] rounded-[24px]'}`}>
+        <div className={`fixed top-28 right-6 z-[500] bg-[#020C1B] border border-white/10 flex flex-col overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.4)] transition-all duration-300 ${isCollapsed ? 'w-12 h-12 rounded-xl' : 'bottom-28 w-[320px] rounded-[24px]'}`}>
             {isCollapsed ? (
                 <button
                     onClick={() => setIsCollapsed(false)}

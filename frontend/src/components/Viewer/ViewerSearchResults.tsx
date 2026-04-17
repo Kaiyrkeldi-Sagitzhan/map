@@ -3,12 +3,10 @@ import { useState } from 'react'
 import { Search, X, Eye, ChevronRight } from 'lucide-react'
 import { getSafeStyle } from '../../types/editor'
 
-const DISABLED_TYPES = new Set(['building', 'city'])
+const DISABLED_TYPES = new Set(['building', 'city', 'other', 'custom', 'mountain', 'boundary'])
 
 const CLASS_LABELS: Record<string, string> = {
     lake: 'Озеро', river: 'Река', forest: 'Лес', road: 'Дорога',
-    building: 'Здание', city: 'Нас. пункт', mountain: 'Гора',
-    boundary: 'Граница', other: 'Другое',
 }
 
 export default function ViewerSearchResults() {

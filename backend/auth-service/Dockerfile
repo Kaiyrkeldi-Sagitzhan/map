@@ -2,22 +2,16 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
+# Copy source code (vendor included, no double-copy)
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /auth-service ./cmd/main.go
+# Build the application using vendored dependencies (no internet needed)
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o /auth-service ./cmd/main.go
 
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 

@@ -110,6 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(newUser))
   }
 
+  const setAuthData = (token: string, user: User) => {
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    setToken(token)
+    setUser(user)
+    setIsAdmin(user.role === 'admin')
+    setIsExpert(user.role === 'expert')
+    setCanEdit(user.role === 'admin' || user.role === 'expert')
+    setIsAuthenticated(true)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -124,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         updateProfile,
         updateUser,
+        setAuthData,
       }}
     >
       {children}

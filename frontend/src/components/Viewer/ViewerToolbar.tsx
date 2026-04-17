@@ -55,7 +55,7 @@ export default function ViewerToolbar() {
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[5000] pointer-events-auto">
             <div className="relative w-fit">
             {/* Main toolbar pill */}
-            <div className="flex items-center gap-0.5 bg-[#020C1B]/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
+            <div className="flex items-center gap-0.5 bg-[#020C1B] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10 p-1.5">
                 {toolBtn('select', <MousePointer2 size={18} />, 'Выделение')}
                 {toolBtn('measure', <Ruler size={18} />, 'Линейка (ПКМ или ESC — сброс)')}
                 {toolBtn('searchArea', <Focus size={18} />, 'Область поиска (Shift — прямоугольник)')}

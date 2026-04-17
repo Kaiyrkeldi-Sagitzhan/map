@@ -152,7 +152,7 @@ export default function AuthModal({ mode, onClose, onSwitchMode }: Props) {
     try {
       const redirectUri = `${window.location.origin}/auth/google/callback`
       const { url } = await apiService.getGoogleAuthURL(redirectUri)
-      window.location.href = url
+      window.open(url, '_blank', 'width=500,height=600')
     } catch {
       setError('Ошибка при подключении Google')
     }

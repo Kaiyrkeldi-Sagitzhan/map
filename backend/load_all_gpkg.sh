@@ -78,6 +78,14 @@ echo "================================================="
 echo "   ULTIMATE GeoPackage Attribute Importer"
 echo "================================================="
 
+# Check if we already have data
+COUNT=$(run_psql "SELECT count(*) FROM geo_objects;" | head -n 1 | grep -oE '^[0-9]+' || echo "0")
+if [ "${COUNT:-0}" -gt 10000 ] && [ "${FORCE_IMPORT:-false}" != "true" ]; then
+  echo "Database already contains $COUNT objects. Skipping import to prevent duplicates."
+  echo "Set FORCE_IMPORT=true to override and truncate existing data."
+  exit 0
+fi
+
 # Prevent concurrent runs that can create conflicting temp objects.
 LOCK_FILE="$SCRIPT_DIR/.load_all_gpkg.lock"
 if [ -f "$LOCK_FILE" ]; then
@@ -92,8 +100,10 @@ fi
 trap 'rm -f "$LOCK_FILE"' EXIT
 echo "$$" > "$LOCK_FILE"
 
-echo "Cleaning up existing data..."
-run_psql "TRUNCATE TABLE geo_objects CASCADE;"
+if [ "${FORCE_IMPORT:-false}" == "true" ]; then
+  echo "Cleaning up existing data (FORCE_IMPORT=true)..."
+  run_psql "TRUNCATE TABLE geo_objects CASCADE;"
+fi
 
 load_layer_pro() {
   local layer_name="$1"
@@ -130,30 +140,36 @@ load_layer_pro() {
         'OSM ' || fclass || ' (Full metadata)',
         to_jsonb($tmp_table.*) - 'geom' - 'fid',
         geom
-      FROM $tmp_table;
+      FROM $tmp_table
+      WHERE '$internal_type' != 'forest'
+         OR fclass IN ('forest', 'wood', 'park', 'nature_reserve', 'grass', 'meadow', 'scrub', 'heath');
     "
 
     run_psql "DROP TABLE IF EXISTS $tmp_table CASCADE;"
 }
 
-# Load every single layer from the archive with full metadata
+# Озёра
 load_layer_pro "gis_osm_water_a_free" "lake"
+# Реки
 load_layer_pro "gis_osm_waterways_free" "river"
+# Дороги
 load_layer_pro "gis_osm_roads_free" "road"
-load_layer_pro "gis_osm_railways_free" "road"
-load_layer_pro "gis_osm_buildings_a_free" "building"
+# Леса (только полигоны landuse типа forest/wood/park)
 load_layer_pro "gis_osm_landuse_a_free" "forest"
-load_layer_pro "gis_osm_natural_a_free" "forest"
-load_layer_pro "gis_osm_pois_free" "other"
-load_layer_pro "gis_osm_places_free" "city"
-load_layer_pro "gis_osm_transport_a_free" "other"
-load_layer_pro "gis_osm_pois_a_free" "other"
-load_layer_pro "gis_osm_natural_free" "other"
-load_layer_pro "gis_osm_places_a_free" "city"
 
 echo "-------------------------------------------------"
 echo "Finalizing Pro Import..."
 run_psql "ANALYZE geo_objects;"
+
+echo "Refreshing stats materialized view..."
+run_psql "
+  CREATE MATERIALIZED VIEW IF NOT EXISTS geo_object_type_stats AS
+  SELECT type, COUNT(*)::int AS count,
+         ST_AsGeoJSON(ST_Centroid(ST_Extent(geometry)))::text AS centroid_json
+  FROM geo_objects WHERE scope = 'global' GROUP BY type ORDER BY count DESC;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_geo_object_type_stats_type ON geo_object_type_stats(type);
+  REFRESH MATERIALIZED VIEW geo_object_type_stats;
+"
 
 echo "PRO DONE! Every attribute is now in the 'metadata' column."
 run_psql "SELECT count(*) FROM geo_objects;"

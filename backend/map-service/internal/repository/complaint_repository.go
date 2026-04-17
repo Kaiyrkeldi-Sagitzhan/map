@@ -152,20 +152,19 @@ type TypeStats struct {
 
 // GetStatsByType returns object counts grouped by type with centroids
 func (r *ComplaintRepository) GetStatsByType(ctx context.Context) ([]TypeStats, error) {
+	// Use materialized view for instant response (refreshed after each import)
 	query := `
-		SELECT type, COUNT(*) as count,
-			   ST_AsGeoJSON(ST_Centroid(ST_Collect(geometry)))::text as centroid_json
-		FROM geo_objects
-		WHERE scope = 'global'
-		GROUP BY type
+		SELECT type, count, centroid_json
+		FROM geo_object_type_stats
 		ORDER BY count DESC
 	`
 	var stats []TypeStats
 	err := r.db.SelectContext(ctx, &stats, query)
 	if err != nil {
-		// Fallback without centroid if PostGIS functions fail
+		// Fallback: compute live (slow but correct if view doesn't exist yet)
 		fallbackQuery := `
-			SELECT type, COUNT(*) as count
+			SELECT type, COUNT(*) as count,
+				   ST_AsGeoJSON(ST_Centroid(ST_Extent(geometry)))::text as centroid_json
 			FROM geo_objects
 			WHERE scope = 'global'
 			GROUP BY type

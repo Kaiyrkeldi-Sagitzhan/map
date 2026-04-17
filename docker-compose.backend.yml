@@ -13,10 +13,9 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
-      - ./database/migrations:/docker-entrypoint-initdb.d/02-migrations
-      - ./database/03-init_data.sh:/docker-entrypoint-initdb.d/03-init_data.sh
-      - ./database/data_dump.sql.gz.bak:/docker-entrypoint-initdb.d/data_dump.sql.gz.bak
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/database/migrations:/docker-entrypoint-initdb.d/02-migrations
+      - ./backend/database/03-init_data.sh:/docker-entrypoint-initdb.d/03-init_data.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kzmap_user -d kzmap"]
       interval: 10s
@@ -45,7 +44,7 @@ services:
   # Auth Service (Go + Gin)
   auth-service:
     build:
-      context: ./auth-service
+      context: ./backend/auth-service
       dockerfile: Dockerfile
     container_name: kzmap-auth-service
     environment:
@@ -57,15 +56,13 @@ services:
       DB_PASSWORD: kzmap_password
       JWT_SECRET: ${JWT_SECRET:-kazakhstan-map-secret-key-2024-production}
       JWT_EXPIRY_HOURS: 24
-      # Google OAuth
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-802334362365-0nuf4kqu0l3lc78kldnalqell9ddop88.apps.googleusercontent.com}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-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}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-https://map.aetherion.work/auth/google/callback}
-      # SMTP (for email verification)
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-adil.groud@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-wypg eorn rqha fcxi}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: noreply@freshmap.team
     ports:
       - "8081:8081"
@@ -84,7 +81,7 @@ services:
   # Map Service (Go + Gin)
   map-service:
     build:
-      context: ./map-service
+      context: ./backend/map-service
       dockerfile: Dockerfile
     container_name: kzmap-map-service
     environment:
@@ -112,34 +109,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Frontend (React + Vite)
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-      network: host
-    container_name: kzmap-frontend
-    environment:
-      VITE_API_URL: https://map.aetherion.work
-      VITE_AUTH_SERVICE_URL: ''
-      VITE_MAP_SERVICE_URL: ''
-    ports:
-      - "3000:3000"
-    depends_on:
-      auth-service:
-        condition: service_healthy
-      map-service:
-        condition: service_healthy
-    networks:
-      - kzmap-network
-    restart: unless-stopped
-
   # API Gateway (Nginx)
   api-gateway:
     image: nginx:alpine
     container_name: kzmap-api-gateway
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
     depends_on:
@@ -147,18 +122,16 @@ services:
         condition: service_healthy
       map-service:
         condition: service_healthy
-      frontend:
-        condition: service_started
     networks:
       - kzmap-network
     restart: unless-stopped
 
-  # Auto-initialization service
+  # DB init / migrations + geodata import
   init-db:
     image: postgis/postgis:15-3.3
     container_name: kzmap-init-db
     volumes:
-      - .:/app
+      - ./backend:/app
     working_dir: /app
     environment:
       PGPASSWORD: kzmap_password
@@ -169,26 +142,38 @@ services:
       - kzmap-network
     entrypoint: >
       sh -c "
-      echo 'Running all migrations (idempotent)...';
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/001_initial_schema.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/002_geo_object_history.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/003_user_profile_and_complaints.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/004_tile_performance.sql;
-      psql -h postgres -U kzmap_user -d kzmap -f database/migrations/005_area_metadata.sql;
+      echo 'Applying database migrations (idempotent)...';
+      for f in database/migrations/*.sql; do
+        echo \"Running $$f...\";
+        psql -h postgres -U kzmap_user -d kzmap -f \"$$f\" || echo \"Warning: $$f failed\";
+      done;
       echo 'Migrations done.';
-      echo 'Loading geodata if gpkg exists...';
+      
+      echo 'Automatic geodata check...';
       if [ -f gpkg_data/kazakhstan.gpkg ]; then
-        count=$$(psql -h postgres -U kzmap_user -d kzmap -t -c \"SELECT count(*) FROM geo_objects;\");
-        if [ $$count -lt 500000 ]; then
-          echo 'Less than 500k objects, running full import...';
-          DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
-        else
-          echo \"Already have $$count objects, skipping import.\";
-        fi;
+        DB_HOST=postgres DB_PORT=5432 ./load_all_gpkg.sh;
       else
-        echo 'No gpkg file found. Download it first (see README).';
+        echo 'No gpkg file found at backend/gpkg_data/kazakhstan.gpkg. Skipping automatic import.';
       fi;
       "
+
+  # Swagger UI — API documentation
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: kzmap-swagger-ui
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./swagger:/usr/share/nginx/html/swagger:ro
+    environment:
+      URLS: >
+        [
+          {"url": "/swagger/auth-service.yaml", "name": "Auth Service"},
+          {"url": "/swagger/map-service.yaml",  "name": "Map Service"}
+        ]
+    networks:
+      - kzmap-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

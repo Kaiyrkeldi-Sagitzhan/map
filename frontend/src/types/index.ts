@@ -180,6 +180,47 @@ export interface StatsResponse {
   total: number;
 }
 
+// Version history types
+export interface VersionInfo {
+  id: string;
+  version_number: number;
+  object_id: string;
+  user_id: string;
+  change_description?: string;
+  changes: {
+    geometry: boolean;
+    name: boolean;
+    description: boolean;
+    type: boolean;
+    scope: boolean;
+    metadata: boolean;
+  };
+  created_at: string;
+}
+
+export interface VersionListResponse {
+  versions: VersionInfo[];
+  total: number;
+  current_version: number;
+}
+
+export interface VersionCompareResult {
+  version1: GeoObject | null;
+  version2: GeoObject | null;
+  diff: {
+    geometry_changed: boolean;
+    name_changed: boolean;
+    description_changed: boolean;
+    type_changed: boolean;
+    scope_changed: boolean;
+    metadata_changed: boolean;
+    geometry_diff?: {
+      old_coords_count: number;
+      new_coords_count: number;
+    };
+  };
+}
+
 // Auth context types
 export interface AuthContextType {
   user: User | null;
@@ -193,4 +234,5 @@ export interface AuthContextType {
   logout: () => void;
   updateProfile: (data: UpdateProfileRequest) => Promise<void>;
   updateUser: (user: User) => void;
+  setAuthData: (token: string, user: User) => void;
 }
