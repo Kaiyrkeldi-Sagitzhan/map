@@ -81,6 +81,8 @@ func main() {
 		}()
 	}
 
+	http.HandleFunc("/api/rebuild", handler)
+	http.HandleFunc("/api/rebuild/", handler)
 	http.HandleFunc("/trigger-rebuild", handler)
 	http.HandleFunc("/trigger-rebuild/", handler)
 
