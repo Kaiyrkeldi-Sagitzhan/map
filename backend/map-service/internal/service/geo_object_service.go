@@ -362,6 +362,30 @@ func (s *GeoObjectService) Update(ctx context.Context, id uuid.UUID, userID uuid
 	if !isNew && s.historyRepo != nil {
 		beforeSnap := buildSnapshot(existing)
 		afterSnap := buildSnapshot(updated)
+
+		// First edit on an imported object: persist the original state as a
+		// real "create" entry so the timeline keeps showing it and rollback
+		// works (a virtual entry has no DB id).
+		prior, _ := s.historyRepo.GetByObjectID(ctx, id, 1)
+		if len(prior) == 0 {
+			importOwner := userID
+			if existing.OwnerID != nil {
+				importOwner = *existing.OwnerID
+			}
+			importEntry := &model.GeoObjectHistory{
+				ID:            uuid.New(),
+				ObjectID:      id,
+				UserID:        importOwner,
+				Action:        "create",
+				Description:   fmt.Sprintf("Исходное состояние \"%s\" (импортировано)", existing.Name),
+				AfterSnapshot: &beforeSnap,
+				CreatedAt:     existing.CreatedAt,
+			}
+			if err := s.historyRepo.Create(ctx, importEntry); err != nil {
+				log.Printf("[WARN] Failed to record imported-state history for object %s: %v", id, err)
+			}
+		}
+
 		historyEntry := &model.GeoObjectHistory{
 			ID:             uuid.New(),
 			ObjectID:       id,

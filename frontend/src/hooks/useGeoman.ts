@@ -740,6 +740,42 @@ export function useGeoman() {
         return () => window.removeEventListener('refresh-map', handleRefresh)
     }, [updateFeature])
 
+    // ─── History preview (hover / rollback prep) ─────────────
+    // Applies geometry directly to the layer, bypassing the PM-edit guard in
+    // the sync effect so the user actually sees the old shape on hover.
+    useEffect(() => {
+        if (!map) return
+        const handlePreview = (e: Event) => {
+            const { id, geometry } = (e as CustomEvent).detail || {}
+            if (!id || !geometry) return
+            const layer = featureIdToLayer.current.get(id)
+            if (!layer) return
+            try {
+                if (geometry.type === 'Point') {
+                    const c = geometry.coordinates as number[]
+                    ;(layer as any)?.setLatLng?.([c[1], c[0]])
+                } else if (geometry.type === 'LineString' || geometry.type === 'Polygon') {
+                    const coords = L.GeoJSON.coordsToLatLngs(
+                        geometry.coordinates,
+                        geometry.type === 'Polygon' ? 1 : 0,
+                    )
+                    ;(layer as any)?.setLatLngs?.(coords as any)
+                } else if (geometry.type === 'MultiPolygon') {
+                    const coords = L.GeoJSON.coordsToLatLngs(geometry.coordinates, 2)
+                    ;(layer as any)?.setLatLngs?.(coords as any)
+                } else if (geometry.type === 'MultiLineString') {
+                    const coords = L.GeoJSON.coordsToLatLngs(geometry.coordinates, 1)
+                    ;(layer as any)?.setLatLngs?.(coords as any)
+                }
+                lastSyncedGeometry.current.set(id, JSON.stringify(geometry))
+            } catch (err) {
+                console.warn('[useGeoman] preview-geometry failed', err)
+            }
+        }
+        window.addEventListener('preview-geometry', handlePreview)
+        return () => window.removeEventListener('preview-geometry', handlePreview)
+    }, [map])
+
     return { layerToFeatureId, featureIdToLayer }
 }
 

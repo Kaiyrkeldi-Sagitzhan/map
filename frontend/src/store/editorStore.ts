@@ -256,6 +256,13 @@ export const useEditorStore = create<EditorState>()(
                     features: s.features.map((f) => (f.id === id ? { ...f, ...patch } : f)),
                 }))
                 get().rebuildLayers()
+                // Geometry previews (history hover, rollback prep) must bypass
+                // useGeoman's PM-edit guard, otherwise the layer doesn't update.
+                if (patch.geometry && typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('preview-geometry', {
+                        detail: { id, geometry: patch.geometry },
+                    }))
+                }
             },
 
             deleteFeature: (id) => {

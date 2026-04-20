@@ -31,29 +31,9 @@ func (s *GeoObjectHistoryService) GetByObjectID(ctx context.Context, objectID uu
 		return nil, err
 	}
 
-	// If no history exists, try to create a virtual "Initial State" entry
-	if len(history) == 0 {
-		obj, err := s.objectRepo.GetByID(ctx, objectID)
-		if err == nil && obj != nil {
-			// Create a snapshot of current state
-			snapshot, _ := json.Marshal(obj)
-			snapRaw := json.RawMessage(snapshot)
-			return []dto.GeoObjectHistoryResponse{
-				{
-					ID:          uuid.Nil,
-					ObjectID:    objectID,
-					Action:      "create",
-					Description: "Исходное состояние (импортировано)",
-					AfterSnapshot: &snapRaw,
-					CreatedAt:   obj.CreatedAt,
-				},
-			}, nil
-		}
-	}
-
-	responses := make([]dto.GeoObjectHistoryResponse, len(history))
-	for i, h := range history {
-		responses[i] = dto.GeoObjectHistoryResponse{
+	responses := make([]dto.GeoObjectHistoryResponse, 0, len(history)+1)
+	for _, h := range history {
+		responses = append(responses, dto.GeoObjectHistoryResponse{
 			ID:             h.ID,
 			ObjectID:       h.ObjectID,
 			UserID:         h.UserID,
@@ -62,13 +42,54 @@ func (s *GeoObjectHistoryService) GetByObjectID(ctx context.Context, objectID uu
 			BeforeSnapshot: h.BeforeSnapshot,
 			AfterSnapshot:  h.AfterSnapshot,
 			CreatedAt:      h.CreatedAt,
+		})
+	}
+
+	// Prepend a virtual "Initial state" entry when there is no real "create"
+	// record (e.g. objects loaded via gpkg import). Without this, the first
+	// edit makes the original state vanish from the timeline.
+	hasCreate := false
+	for _, r := range responses {
+		if r.Action == "create" {
+			hasCreate = true
+			break
 		}
 	}
+	if !hasCreate {
+		obj, err := s.objectRepo.GetByID(ctx, objectID)
+		if err == nil && obj != nil {
+			// Prefer the beforeSnapshot of the oldest entry (the pre-edit state);
+			// fall back to current object state when no edits have happened yet.
+			var snap json.RawMessage
+			if n := len(responses); n > 0 && responses[n-1].BeforeSnapshot != nil && len(*responses[n-1].BeforeSnapshot) > 0 {
+				snap = *responses[n-1].BeforeSnapshot
+			} else {
+				snapshot, _ := json.Marshal(obj)
+				snap = json.RawMessage(snapshot)
+			}
+			responses = append(responses, dto.GeoObjectHistoryResponse{
+				ID:            uuid.Nil,
+				ObjectID:      objectID,
+				Action:        "create",
+				Description:   "Исходное состояние (импортировано)",
+				AfterSnapshot: &snap,
+				CreatedAt:     obj.CreatedAt,
+			})
+		}
+	}
+
 	return responses, nil
 }
 
 // Rollback restores an object to a previous state
 func (s *GeoObjectHistoryService) Rollback(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error {
+	// historyID == uuid.Nil is the virtual "Initial state" entry produced by
+	// GetByObjectID for imported objects with no real history. There's no row
+	// to look up, so reject the rollback with a clear message.
+	if historyID == uuid.Nil {
+		return errors.New("cannot rollback to the imported initial state")
+	}
+
 	entry, err := s.historyRepo.GetByID(ctx, historyID)
 	if err != nil {
 		return err
