@@ -18,4 +18,5 @@ services:
 
 networks:
   kzmap-network:
-    driver: bridge
+    external: true
+    name: map_kzmap-network
