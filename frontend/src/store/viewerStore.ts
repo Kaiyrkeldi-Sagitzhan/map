@@ -55,6 +55,9 @@ interface ViewerState {
   // Type filter (empty string = all types)
   featureClassFilter: string
 
+  // Area-search layer filters
+  searchAreaLayers: Set<string>
+
   // Actions
   setSelectedFeature: (feature: ViewerFeature | null) => void
   setPrimarySelectedFeature: (feature: ViewerFeature | null) => void
@@ -73,9 +76,12 @@ interface ViewerState {
   setHighlight: (geometry: any, style?: any) => void
   clearHighlight: () => void
   setFeatureClassFilter: (filter: string) => void
+  toggleSearchAreaLayer: (layerId: string) => void
+  resetSearchAreaLayers: () => void
 }
 
-const ALL_LAYERS = new Set(['lake', 'river', 'forest', 'road'])
+const DEFAULT_VISIBLE_LAYERS = new Set(['lake', 'river', 'forest', 'road', 'mountain', 'boundary', 'other'])
+const DEFAULT_SEARCH_AREA_LAYERS = new Set(['lake', 'river', 'forest', 'road'])
 
 export const useViewerStore = create<ViewerState>((set) => ({
   selectedFeature: null,
@@ -91,8 +97,9 @@ export const useViewerStore = create<ViewerState>((set) => ({
   showMap: true,
   mapOpacity: 1,
   activeTool: 'select',
-  visibleLayers: new Set(ALL_LAYERS),
+  visibleLayers: new Set(DEFAULT_VISIBLE_LAYERS),
   featureClassFilter: '',
+  searchAreaLayers: new Set(DEFAULT_SEARCH_AREA_LAYERS),
 
   setSelectedFeature: (feature) => set((_s) => ({
     selectedFeature: feature,
@@ -181,6 +188,16 @@ export const useViewerStore = create<ViewerState>((set) => ({
   setHighlight: (geometry, style) => set({ highlightGeometry: geometry, highlightStyle: style || null }),
   clearHighlight: () => set({ highlightGeometry: null, highlightStyle: null }),
   setFeatureClassFilter: (filter) => set({ featureClassFilter: filter }),
+  toggleSearchAreaLayer: (layerId: string) => set((state) => {
+    const next = new Set(state.searchAreaLayers)
+    if (next.has(layerId)) {
+      next.delete(layerId)
+    } else {
+      next.add(layerId)
+    }
+    return { searchAreaLayers: next }
+  }),
+  resetSearchAreaLayers: () => set({ searchAreaLayers: new Set(DEFAULT_SEARCH_AREA_LAYERS) }),
 
   fetchFeatureHistory: async (objectId: string) => {
     try {

@@ -97,14 +97,33 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
     // ─── Search: perform bounds search with type filter ─────
     const performBoundsSearch = useCallback(async (bounds: L.LatLngBounds) => {
         const zoom = map.getZoom()
-        const typeFilter = useViewerStore.getState().featureClassFilter
+        const { featureClassFilter, searchAreaLayers } = useViewerStore.getState()
+        const selectedLayers = Array.from(searchAreaLayers)
         try {
-            const res = await apiService.getGeoObjects(typeFilter || undefined, {
+            if (selectedLayers.length === 0) {
+                useViewerStore.getState().setSearchResults([])
+                setActiveTool('select')
+                return
+            }
+
+            const requestBounds = {
                 minLat: bounds.getSouth(), minLng: bounds.getWest(),
                 maxLat: bounds.getNorth(), maxLng: bounds.getEast(),
                 zoom, filterByZoom: false
-            } as any)
-            const results = (res.objects || []).map(mapObjToFeature)
+            } as any
+
+            const responses = await Promise.all(
+                selectedLayers.map((layerType) => apiService.getGeoObjects(layerType || featureClassFilter || undefined, requestBounds))
+            )
+
+            const byId = new Map<string, any>()
+            for (const res of responses) {
+                for (const obj of (res.objects || [])) {
+                    byId.set(obj.id, obj)
+                }
+            }
+
+            const results = Array.from(byId.values()).map(mapObjToFeature)
             useViewerStore.getState().setSearchResults(results)
             setActiveTool('select')
         } catch (err) { console.error('Search failed:', err) }
@@ -260,7 +279,7 @@ const MapStateTracker = ({ onComplaintPick }: { onComplaintPick: (feature: any) 
         const onClick = (e: any) => {
             const tool = activeToolRef.current
             // Geoman handles searchArea clicks internally — do not intercept
-            if (tool === 'searchArea') return
+            if (tool === 'searchArea' || tool === 'measure') return
 
             // Skip duplicate native map click after vector-tile forwarded click.
             // In some browsers originalEvent marker is not reliably preserved.
@@ -411,6 +430,7 @@ const SearchResultsOverlay = () => {
     const setHighlight = useViewerStore((s) => s.setHighlight)
     const fetchFeatureHistory = useViewerStore((s) => s.fetchFeatureHistory)
     const activeTool = useViewerStore((s) => s.activeTool)
+    const visibleLayers = useViewerStore((s) => s.visibleLayers)
 
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -435,6 +455,7 @@ const SearchResultsOverlay = () => {
         if (searchResults.length === 0) return
 
         searchResults.forEach(f => {
+            if (!visibleLayers.has(f.type)) return
             const style = getAdvancedStyle(f.type as any, f.metadata)
             const isLine = f.type === 'road' || f.type === 'river'
 
@@ -483,7 +504,7 @@ const SearchResultsOverlay = () => {
             layersRef.current.forEach(l => map.removeLayer(l))
             layersRef.current = []
         }
-    }, [map, searchResults, setSelectedFeature, toggleSelectedFeature, setHighlight, fetchFeatureHistory, activeTool])
+    }, [map, searchResults, visibleLayers, setSelectedFeature, toggleSelectedFeature, setHighlight, fetchFeatureHistory, activeTool])
 
     return null
 }
